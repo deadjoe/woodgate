@@ -94,7 +94,30 @@ uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 安装到Claude Desktop:
 
 ```bash
-mcp install woodgate/server.py --name "Red Hat搜索"
+# 设置环境变量
+export REDHAT_USERNAME="your_username"
+export REDHAT_PASSWORD="your_password"
+
+# 安装MCP服务器到Claude Desktop
+/path/to/venv/bin/mcp install server.py:mcp --name "Red Hat KB Search"
+```
+
+如果您使用的是项目的虚拟环境，命令应该是:
+
+```bash
+export REDHAT_USERNAME="your_username"
+export REDHAT_PASSWORD="your_password"
+.venv/bin/mcp install server.py:mcp --name "Red Hat KB Search"
+```
+
+要启动带有调试日志的开发服务器:
+
+```bash
+export REDHAT_USERNAME="your_username"
+export REDHAT_PASSWORD="your_password"
+export PYTHONUNBUFFERED=1
+export LOGLEVEL=DEBUG
+.venv/bin/mcp dev server.py:mcp
 ```
 
 ### MCP工具使用示例

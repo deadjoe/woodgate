@@ -1,2 +1,4 @@
 selenium>=4.0.0
 webdriver-manager>=3.8.5
+mcp>=1.6.0
+httpx>=0.24.0

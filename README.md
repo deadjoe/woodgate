@@ -223,6 +223,43 @@ tests/                   # 测试目录
 ├── test_search_extended.py # 扩展搜索测试
 ├── test_server.py       # 服务器测试
 └── test_utils.py        # 工具函数测试
+
+# 根目录关键文件
+server.py                # 独立MCP服务器实现，包含所有必要功能
+mcp_server.py            # MCP服务器启动脚本，处理依赖和环境
+```
+
+### 关键文件说明
+
+#### server.py
+
+独立的MCP服务器实现，包含所有必要的功能，可以直接与Claude Desktop集成。它具有以下特点：
+
+- 自动安装依赖
+- 内置所有功能（浏览器管理、认证、搜索等）
+- 详细的调试日志
+- 全面的错误处理
+
+#### mcp_server.py
+
+MCP服务器启动脚本，在不同环境下确保服务器能够正确启动：
+
+- 自动检查并安装必要的依赖
+- 智能模块导入（支持包安装和直接脚本运行两种模式）
+- 自动路径管理
+- 全面的错误处理
+- 详细的日志记录
+
+使用方法：
+
+```bash
+# 直接运行
+python mcp_server.py
+
+# 或者设置环境变量后运行
+export REDHAT_USERNAME="your_username"
+export REDHAT_PASSWORD="your_password"
+python mcp_server.py
 ```
 
 ## 许可证

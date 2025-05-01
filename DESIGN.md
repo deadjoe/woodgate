@@ -29,7 +29,7 @@ Woodgate 采用模块化架构设计，主要分为以下几个部分：
 
 ### 2.1 整体架构图
 
-```
+```ascii
 +------------------+     +------------------+     +------------------+
 |                  |     |                  |     |                  |
 |  MCP 客户端      |     |  MCP 服务器      |     |  Red Hat 客户门户 |
@@ -48,7 +48,7 @@ Woodgate 采用模块化架构设计，主要分为以下几个部分：
 
 ### 2.2 模块结构
 
-```
+```text
 woodgate/
 ├── __init__.py          # 包初始化
 ├── __main__.py          # 命令行入口点
@@ -301,16 +301,16 @@ def search_help() -> str:
     """提供搜索帮助信息"""
     return """
     # Red Hat 客户门户搜索帮助
-    
+
     您可以使用以下参数进行搜索：
-    
+
     - **query**: 搜索关键词，例如 "memory leak"
     - **products**: 要搜索的产品列表，例如 ["Red Hat Enterprise Linux", "Red Hat OpenShift"]
     - **doc_types**: 文档类型列表，例如 ["Solution", "Article"]
     - **page**: 页码，默认为1
     - **rows**: 每页结果数，默认为20
     - **sort_by**: 排序方式，可选值: "relevant", "lastModifiedDate desc", "lastModifiedDate asc"
-    
+
     示例：search(query="kubernetes troubleshooting", products=["Red Hat OpenShift Container Platform"], doc_types=["Solution"])
     """
 ```
@@ -323,12 +323,12 @@ def search_example() -> str:
     """提供搜索示例"""
     return """
     # Red Hat 客户门户搜索示例
-    
+
     ## 基本搜索
     ```python
     search(query="memory leak")
     ```
-    
+
     ## 带产品过滤的搜索
     ```python
     search(
@@ -336,7 +336,7 @@ def search_example() -> str:
         products=["Red Hat OpenShift Container Platform"]
     )
     ```
-    
+
     # ...更多示例...
     """
 ```
@@ -354,11 +354,35 @@ def search_example() -> str:
 
 #### 4.5.2 `mcp_server.py`
 
-`mcp_server.py` 是一个辅助脚本，用于启动 MCP 服务器，具有以下特点：
+`mcp_server.py` 是一个重要的辅助脚本，用于启动 MCP 服务器，它在项目中扮演着关键的桥接角色，特别是在不同环境下确保服务器能够正确启动。该文件具有以下特点：
 
-- **依赖检查**: 检查并安装必要的依赖
-- **模块导入**: 尝试导入 woodgate.server 模块，如果失败则尝试直接导入 server.py
-- **错误处理**: 处理导入和启动过程中的错误
+- **依赖检查与安装**: 自动检查并安装必要的依赖包（selenium, webdriver-manager, httpx），确保运行环境完整
+- **智能模块导入**: 实现了两种导入策略：
+  1. 首先尝试从标准包结构导入 `woodgate.server` 模块（适用于已安装的包）
+  2. 如果失败，则尝试直接导入 `server.py`（适用于直接运行脚本的情况）
+- **路径管理**: 自动将当前目录添加到 Python 路径，确保模块能够被正确导入
+- **错误处理**: 实现全面的错误处理，包括依赖安装错误、模块导入错误和服务器启动错误
+- **日志记录**: 提供详细的日志记录，便于诊断问题
+
+这个文件的主要用途是：
+
+1. 作为独立入口点运行 MCP 服务器
+2. 在不同环境（已安装包环境和直接脚本运行环境）中提供一致的启动体验
+3. 自动处理依赖和环境问题，降低用户使用门槛
+
+使用示例：
+
+```bash
+# 直接运行
+python mcp_server.py
+
+# 或者设置环境变量后运行
+export REDHAT_USERNAME="your_username"
+export REDHAT_PASSWORD="your_password"
+python mcp_server.py
+```
+
+`mcp_server.py` 与 `server.py` 的关系是互补的：`server.py` 提供核心 MCP 服务器实现，而 `mcp_server.py` 提供便捷的启动和环境管理功能。
 
 ## 5. 日志系统
 
@@ -434,7 +458,7 @@ Woodgate 提供详细的错误报告：
 
 Woodgate 使用 pytest 进行单元测试，测试结构如下：
 
-```
+```text
 tests/
 ├── test_auth.py         # 认证测试
 ├── test_auth_extended.py# 扩展认证测试
@@ -634,12 +658,14 @@ uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 #### 12.1.1 登录失败
 
 可能的原因：
+
 - 凭据错误
 - 网络问题
 - 页面结构变化
 - Cookie 弹窗干扰
 
 解决方法：
+
 - 检查环境变量
 - 检查网络连接
 - 更新选择器
@@ -648,12 +674,14 @@ uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 #### 12.1.2 搜索结果为空
 
 可能的原因：
+
 - 搜索关键词不匹配
 - 产品或文档类型过滤过于严格
 - 页面结构变化
 - 结果提取逻辑错误
 
 解决方法：
+
 - 使用更通用的关键词
 - 减少过滤条件
 - 更新选择器

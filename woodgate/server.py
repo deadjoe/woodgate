@@ -46,8 +46,9 @@ async def search(
     """
     logger.info(f"执行搜索: '{query}'")
 
-    browser = await initialize_browser()
+    browser = None
     try:
+        browser = await initialize_browser()
         username, password = get_credentials()
         login_success = await login_to_redhat_portal(browser, username, password)
         if not login_success:
@@ -63,8 +64,22 @@ async def search(
             sort_by=sort_by,
         )
         return results
+    except Exception as e:
+        logger.error(f"搜索过程中出错: {e}")
+        import traceback
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return [{"error": f"搜索过程中出错: {str(e)}"}]
     finally:
-        await browser.quit()
+        try:
+            # 安全地关闭浏览器
+            if browser:
+                try:
+                    await browser.quit()
+                except Exception:
+                    # 如果异步关闭失败，尝试同步关闭
+                    browser.quit()
+        except Exception as e:
+            logger.warning(f"关闭浏览器时出错: {e}")
 
 
 @mcp.tool()
@@ -80,8 +95,9 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
     """
     logger.info(f"获取产品警报: '{product}'")
 
-    browser = await initialize_browser()
+    browser = None
     try:
+        browser = await initialize_browser()
         username, password = get_credentials()
         login_success = await login_to_redhat_portal(browser, username, password)
         if not login_success:
@@ -89,8 +105,22 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
 
         alerts = await get_product_alerts(browser, product)
         return alerts
+    except Exception as e:
+        logger.error(f"获取警报过程中出错: {e}")
+        import traceback
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return [{"error": f"获取警报过程中出错: {str(e)}"}]
     finally:
-        await browser.quit()
+        try:
+            # 安全地关闭浏览器
+            if browser:
+                try:
+                    await browser.quit()
+                except Exception:
+                    # 如果异步关闭失败，尝试同步关闭
+                    browser.quit()
+        except Exception as e:
+            logger.warning(f"关闭浏览器时出错: {e}")
 
 
 @mcp.tool()
@@ -106,8 +136,9 @@ async def get_document(document_url: str) -> Dict[str, Any]:
     """
     logger.info(f"获取文档内容: {document_url}")
 
-    browser = await initialize_browser()
+    browser = None
     try:
+        browser = await initialize_browser()
         username, password = get_credentials()
         login_success = await login_to_redhat_portal(browser, username, password)
         if not login_success:
@@ -115,8 +146,22 @@ async def get_document(document_url: str) -> Dict[str, Any]:
 
         document = await get_document_content(browser, document_url)
         return document
+    except Exception as e:
+        logger.error(f"获取文档内容过程中出错: {e}")
+        import traceback
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
+        return {"error": f"获取文档内容过程中出错: {str(e)}"}
     finally:
-        await browser.quit()
+        try:
+            # 安全地关闭浏览器
+            if browser:
+                try:
+                    await browser.quit()
+                except Exception:
+                    # 如果异步关闭失败，尝试同步关闭
+                    browser.quit()
+        except Exception as e:
+            logger.warning(f"关闭浏览器时出错: {e}")
 
 
 @mcp.resource("config://products")

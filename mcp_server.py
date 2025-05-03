@@ -13,19 +13,21 @@ import importlib.util
 # 例如: export REDHAT_USERNAME="your_username" && export REDHAT_PASSWORD="your_password"
 
 # 设置日志
-logging.basicConfig(level=logging.INFO,
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                   stream=sys.stderr)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    stream=sys.stderr,
+)
 logger = logging.getLogger("woodgate-mcp")
 
 # 检查并安装必要的依赖
-required_packages = ['selenium', 'webdriver-manager', 'httpx']
+required_packages = ["selenium", "webdriver-manager", "httpx"]
 
 for package in required_packages:
     if importlib.util.find_spec(package) is None:
         logger.info(f"正在安装 {package}...")
         try:
-            subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
             logger.info(f"{package} 安装成功")
         except Exception as e:
             logger.error(f"安装 {package} 失败: {e}")
@@ -42,6 +44,7 @@ try:
 
     # 尝试导入
     from woodgate.server import mcp
+
     logger.info("成功导入woodgate.server模块")
 except ImportError as e:
     logger.error(f"导入错误: {e}")
@@ -49,6 +52,7 @@ except ImportError as e:
     try:
         logger.info("尝试直接导入server.py...")
         import server
+
         mcp = server.mcp
         logger.info("成功导入server.py")
     except ImportError as e2:

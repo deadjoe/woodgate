@@ -1,13 +1,13 @@
 """
-MCP服务器模块 - 实现Model Context Protocol服务器
+MCP服务器模块 - 实现Model Context Protocol服务器（同步版本）
 """
 
 import os
 import sys
 import logging
-import asyncio
 import subprocess
 import importlib.util
+import traceback
 from typing import List, Dict, Any, Optional
 
 # 环境变量应该在运行时设置，而不是硬编码在代码中
@@ -82,9 +82,9 @@ def get_credentials():
     return username, password
 
 
-# 初始化浏览器
-async def initialize_browser():
-    """初始化Chrome浏览器"""
+# 初始化浏览器 - 同步版本
+def initialize_browser():
+    """初始化Chrome浏览器 - 同步版本"""
     logger.debug("初始化Chrome浏览器...")
 
     try:
@@ -101,28 +101,10 @@ async def initialize_browser():
         options.add_argument("--blink-settings=imagesEnabled=false")  # 禁用图片加载
         options.page_load_strategy = "eager"  # 使用eager加载策略
 
-        # 安全地获取事件循环并创建浏览器
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 如果事件循环正在运行，使用run_in_executor
-                driver = await loop.run_in_executor(
-                    None,
-                    lambda: webdriver.Chrome(
-                        service=ChromeService(ChromeDriverManager().install()), options=options
-                    ),
-                )
-            else:
-                # 如果事件循环未运行，直接创建浏览器
-                driver = webdriver.Chrome(
-                    service=ChromeService(ChromeDriverManager().install()), options=options
-                )
-        except RuntimeError:
-            # 如果无法获取事件循环，创建一个新的
-            logger.warning("无法获取事件循环，创建新的浏览器实例")
-            driver = webdriver.Chrome(
-                service=ChromeService(ChromeDriverManager().install()), options=options
-            )
+        # 直接创建浏览器
+        driver = webdriver.Chrome(
+            service=ChromeService(ChromeDriverManager().install()), options=options
+        )
 
         # 设置页面加载超时时间
         driver.set_page_load_timeout(20)
@@ -133,36 +115,38 @@ async def initialize_browser():
         return driver
     except Exception as e:
         logger.error(f"浏览器初始化失败: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         raise
 
 
-# 处理Cookie弹窗
-async def handle_cookie_popup(driver):
-    """处理Cookie弹窗"""
+# 处理Cookie弹窗 - 同步版本
+def handle_cookie_popup(driver):
+    """处理Cookie弹窗 - 同步版本"""
     try:
         # 等待Cookie弹窗出现
-        cookie_button = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.ID, "truste-consent-button"))
-        )
-        cookie_button.click()
-        await asyncio.sleep(1)
-        return True
-    except Exception:
-        # 如果没有Cookie弹窗，继续
+        try:
+            cookie_button = WebDriverWait(driver, 5).until(
+                EC.presence_of_element_located((By.ID, "truste-consent-button"))
+            )
+            cookie_button.click()
+            return True
+        except Exception:
+            # 如果没有Cookie弹窗，继续
+            return False
+    except Exception as e:
+        logger.warning(f"处理Cookie弹窗时出错: {e}")
         return False
 
 
-# 登录到Red Hat客户门户
-async def login_to_redhat_portal(driver, username, password):
-    """登录到Red Hat客户门户"""
+# 登录到Red Hat客户门户 - 同步版本
+def login_to_redhat_portal(driver, username, password):
+    """登录到Red Hat客户门户 - 同步版本"""
     try:
         # 访问Red Hat客户门户
         driver.get(REDHAT_PORTAL_URL)
 
         # 处理Cookie弹窗
-        await handle_cookie_popup(driver)
+        handle_cookie_popup(driver)
 
         # 点击登录按钮
         try:
@@ -207,11 +191,11 @@ async def login_to_redhat_portal(driver, username, password):
         return False
 
 
-# 执行搜索
-async def perform_search(
+# 执行搜索 - 同步版本
+def perform_search(
     driver, query, products=None, doc_types=None, page=1, rows=20, sort_by="relevant"
 ):
-    """在Red Hat客户门户执行搜索"""
+    """在Red Hat客户门户执行搜索 - 同步版本"""
     try:
         # 构建搜索URL
         search_url = f"{REDHAT_SEARCH_URL}?q={query}&p={page}&rows={rows}&sort={sort_by}"
@@ -295,9 +279,9 @@ async def perform_search(
         return []
 
 
-# 获取产品警报
-async def get_product_alerts(driver, product):
-    """获取特定产品的警报信息"""
+# 获取产品警报 - 同步版本
+def get_product_alerts(driver, product):
+    """获取特定产品的警报信息 - 同步版本"""
     try:
         # 构建警报URL
         alerts_url = f"{REDHAT_PORTAL_URL}/products/{product}/alerts"
@@ -362,9 +346,9 @@ async def get_product_alerts(driver, product):
         return []
 
 
-# 获取文档内容
-async def get_document_content(driver, document_url):
-    """获取特定文档的详细内容"""
+# 获取文档内容 - 同步版本
+def get_document_content(driver, document_url):
+    """获取特定文档的详细内容 - 同步版本"""
     try:
         # 访问文档页面
         driver.get(document_url)
@@ -438,7 +422,7 @@ def get_document_types():
 
 
 @mcp.tool()
-async def search(
+def search(
     query: str,
     products: Optional[List[str]] = None,
     doc_types: Optional[List[str]] = None,
@@ -467,7 +451,7 @@ async def search(
     browser = None
     try:
         logger.debug("初始化浏览器...")
-        browser = await initialize_browser()
+        browser = initialize_browser()
         logger.debug("浏览器初始化成功")
 
         logger.debug("获取凭据...")
@@ -475,7 +459,7 @@ async def search(
         logger.debug(f"凭据获取成功: username='{username}'")
 
         logger.debug("登录到Red Hat客户门户...")
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = login_to_redhat_portal(browser, username, password)
         logger.debug(f"登录结果: {login_success}")
 
         if not login_success:
@@ -483,7 +467,7 @@ async def search(
             return [{"error": "登录失败，请检查凭据"}]
 
         logger.debug("执行搜索...")
-        results = await perform_search(
+        results = perform_search(
             browser,
             query=query,
             products=products or [],
@@ -496,7 +480,6 @@ async def search(
         return results
     except Exception as e:
         logger.error(f"搜索过程中出错: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return [{"error": f"搜索过程中出错: {str(e)}"}]
     finally:
@@ -504,18 +487,14 @@ async def search(
             # 安全地关闭浏览器
             if browser:
                 logger.debug("关闭浏览器...")
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
+                browser.quit()
                 logger.debug("浏览器已关闭")
         except Exception as e:
             logger.warning(f"关闭浏览器时出错: {e}")
 
 
 @mcp.tool()
-async def get_alerts(product: str) -> List[Dict[str, Any]]:
+def get_alerts(product: str) -> List[Dict[str, Any]]:
     """
     获取特定产品的警报信息
 
@@ -529,28 +508,23 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
 
     browser = None
     try:
-        browser = await initialize_browser()
+        browser = initialize_browser()
         username, password = get_credentials()
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = login_to_redhat_portal(browser, username, password)
         if not login_success:
             return [{"error": "登录失败，请检查凭据"}]
 
-        alerts = await get_product_alerts(browser, product)
+        alerts = get_product_alerts(browser, product)
         return alerts
     except Exception as e:
         logger.error(f"获取警报过程中出错: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return [{"error": f"获取警报过程中出错: {str(e)}"}]
     finally:
         try:
             # 安全地关闭浏览器
             if browser:
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
+                browser.quit()
             else:
                 logger.warning("浏览器实例为None，无需关闭")
         except Exception as e:
@@ -558,7 +532,7 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
 
 
 @mcp.tool()
-async def get_document(document_url: str) -> Dict[str, Any]:
+def get_document(document_url: str) -> Dict[str, Any]:
     """
     获取特定文档的详细内容
 
@@ -572,28 +546,23 @@ async def get_document(document_url: str) -> Dict[str, Any]:
 
     browser = None
     try:
-        browser = await initialize_browser()
+        browser = initialize_browser()
         username, password = get_credentials()
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = login_to_redhat_portal(browser, username, password)
         if not login_success:
             return {"error": "登录失败，请检查凭据"}
 
-        document = await get_document_content(browser, document_url)
+        document = get_document_content(browser, document_url)
         return document
     except Exception as e:
         logger.error(f"获取文档内容过程中出错: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return {"error": f"获取文档内容过程中出错: {str(e)}"}
     finally:
         try:
             # 安全地关闭浏览器
             if browser:
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
+                browser.quit()
             else:
                 logger.warning("浏览器实例为None，无需关闭")
         except Exception as e:
@@ -610,6 +579,24 @@ def available_products() -> List[str]:
 def document_types() -> List[str]:
     """获取可用的文档类型"""
     return get_document_types()
+
+
+@mcp.resource("config://search-params")
+def search_params() -> Dict[str, Any]:
+    """获取搜索参数配置"""
+    return {
+        "sort_options": [
+            {"value": "relevant", "label": "相关性"},
+            {"value": "lastModifiedDate desc", "label": "最新更新"},
+            {"value": "lastModifiedDate asc", "label": "最早更新"},
+            {"value": "portal_publication_date desc", "label": "最新发布"},
+            {"value": "portal_publication_date asc", "label": "最早发布"},
+        ],
+        "default_rows": 20,
+        "max_rows": 100,
+        "products": get_available_products(),
+        "doc_types": get_document_types(),
+    }
 
 
 @mcp.prompt()

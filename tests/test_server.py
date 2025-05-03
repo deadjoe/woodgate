@@ -4,8 +4,9 @@ MCP服务器模块测试
 
 import pytest
 from unittest.mock import patch, AsyncMock
+from playwright.async_api import Page, Browser, BrowserContext, Playwright
 
-from woodgate.server import (
+from server import (
     search,
     get_alerts,
     get_document,
@@ -47,8 +48,11 @@ def test_search_params():
 @pytest.mark.asyncio
 async def test_search():
     """测试搜索工具"""
-    # 模拟浏览器和搜索结果
+    # 模拟Playwright组件
+    mock_playwright = AsyncMock()
     mock_browser = AsyncMock()
+    mock_context = AsyncMock()
+    mock_page = AsyncMock()
     mock_results = [
         {"title": "Test Result 1", "url": "https://example.com/1"},
         {"title": "Test Result 2", "url": "https://example.com/2"},
@@ -56,39 +60,46 @@ async def test_search():
 
     # 模拟函数
     with patch(
-        "woodgate.server.initialize_browser", return_value=mock_browser
+        "server.initialize_browser",
+        return_value=(mock_playwright, mock_browser, mock_context, mock_page)
     ) as mock_init_browser:
-        with patch("woodgate.server.login_to_redhat_portal", return_value=True) as mock_login:
-            with patch("woodgate.server.perform_search", return_value=mock_results) as mock_search:
+        with patch("server.login_to_redhat_portal", return_value=True) as mock_login:
+            with patch("server.perform_search", return_value=mock_results) as mock_search:
                 with patch(
-                    "woodgate.server.get_credentials", return_value=("test_user", "test_pass")
+                    "server.get_credentials", return_value=("test_user", "test_pass")
                 ):
-                    # 调用被测试的函数
-                    results = await search(
-                        query="test query", products=["Test Product"], doc_types=["Test Type"]
-                    )
+                    with patch("server.close_browser") as mock_close_browser:
+                        # 调用被测试的函数
+                        results = await search(
+                            query="test query", products=["Test Product"], doc_types=["Test Type"]
+                        )
 
-                    # 验证结果
-                    assert results == mock_results
-                    assert mock_init_browser.called
-                    mock_login.assert_called_once_with(mock_browser, "test_user", "test_pass")
-                    mock_search.assert_called_once_with(
-                        mock_browser,
-                        query="test query",
-                        products=["Test Product"],
-                        doc_types=["Test Type"],
-                        page=1,
-                        rows=20,
-                        sort_by="relevant",
-                    )
-                    mock_browser.quit.assert_called_once()
+                        # 验证结果
+                        assert results == mock_results
+                        assert mock_init_browser.called
+                        mock_login.assert_called_once_with(mock_page, mock_context, "test_user", "test_pass")
+                        mock_search.assert_called_once_with(
+                            mock_page,
+                            query="test query",
+                            products=["Test Product"],
+                            doc_types=["Test Type"],
+                            page_num=1,
+                            rows=20,
+                            sort_by="relevant",
+                        )
+                        mock_close_browser.assert_called_once_with(
+                            mock_playwright, mock_browser, mock_context, mock_page
+                        )
 
 
 @pytest.mark.asyncio
 async def test_get_alerts():
     """测试获取警报工具"""
-    # 模拟浏览器和警报结果
+    # 模拟Playwright组件
+    mock_playwright = AsyncMock()
     mock_browser = AsyncMock()
+    mock_context = AsyncMock()
+    mock_page = AsyncMock()
     mock_alerts = [
         {"title": "Test Alert 1", "severity": "Critical"},
         {"title": "Test Alert 2", "severity": "Important"},
@@ -96,31 +107,38 @@ async def test_get_alerts():
 
     # 模拟函数
     with patch(
-        "woodgate.server.initialize_browser", return_value=mock_browser
+        "server.initialize_browser",
+        return_value=(mock_playwright, mock_browser, mock_context, mock_page)
     ) as mock_init_browser:
-        with patch("woodgate.server.login_to_redhat_portal", return_value=True) as mock_login:
+        with patch("server.login_to_redhat_portal", return_value=True) as mock_login:
             with patch(
-                "woodgate.server.get_product_alerts", return_value=mock_alerts
+                "server.get_product_alerts", return_value=mock_alerts
             ) as mock_get_alerts:
                 with patch(
-                    "woodgate.server.get_credentials", return_value=("test_user", "test_pass")
+                    "server.get_credentials", return_value=("test_user", "test_pass")
                 ):
-                    # 调用被测试的函数
-                    alerts = await get_alerts(product="Test Product")
+                    with patch("server.close_browser") as mock_close_browser:
+                        # 调用被测试的函数
+                        alerts = await get_alerts(product="Test Product")
 
-                    # 验证结果
-                    assert alerts == mock_alerts
-                    assert mock_init_browser.called
-                    mock_login.assert_called_once_with(mock_browser, "test_user", "test_pass")
-                    mock_get_alerts.assert_called_once_with(mock_browser, "Test Product")
-                    mock_browser.quit.assert_called_once()
+                        # 验证结果
+                        assert alerts == mock_alerts
+                        assert mock_init_browser.called
+                        mock_login.assert_called_once_with(mock_page, mock_context, "test_user", "test_pass")
+                        mock_get_alerts.assert_called_once_with(mock_page, "Test Product")
+                        mock_close_browser.assert_called_once_with(
+                            mock_playwright, mock_browser, mock_context, mock_page
+                        )
 
 
 @pytest.mark.asyncio
 async def test_get_document():
     """测试获取文档工具"""
-    # 模拟浏览器和文档结果
+    # 模拟Playwright组件
+    mock_playwright = AsyncMock()
     mock_browser = AsyncMock()
+    mock_context = AsyncMock()
+    mock_page = AsyncMock()
     mock_document = {
         "title": "Test Document",
         "content": "Test content",
@@ -130,21 +148,25 @@ async def test_get_document():
 
     # 模拟函数
     with patch(
-        "woodgate.server.initialize_browser", return_value=mock_browser
+        "server.initialize_browser",
+        return_value=(mock_playwright, mock_browser, mock_context, mock_page)
     ) as mock_init_browser:
-        with patch("woodgate.server.login_to_redhat_portal", return_value=True) as mock_login:
+        with patch("server.login_to_redhat_portal", return_value=True) as mock_login:
             with patch(
-                "woodgate.server.get_document_content", return_value=mock_document
+                "server.get_document_content", return_value=mock_document
             ) as mock_get_doc:
                 with patch(
-                    "woodgate.server.get_credentials", return_value=("test_user", "test_pass")
+                    "server.get_credentials", return_value=("test_user", "test_pass")
                 ):
-                    # 调用被测试的函数
-                    document = await get_document(document_url="https://example.com/doc")
+                    with patch("server.close_browser") as mock_close_browser:
+                        # 调用被测试的函数
+                        document = await get_document(document_url="https://example.com/doc")
 
-                    # 验证结果
-                    assert document == mock_document
-                    assert mock_init_browser.called
-                    mock_login.assert_called_once_with(mock_browser, "test_user", "test_pass")
-                    mock_get_doc.assert_called_once_with(mock_browser, "https://example.com/doc")
-                    mock_browser.quit.assert_called_once()
+                        # 验证结果
+                        assert document == mock_document
+                        assert mock_init_browser.called
+                        mock_login.assert_called_once_with(mock_page, mock_context, "test_user", "test_pass")
+                        mock_get_doc.assert_called_once_with(mock_page, "https://example.com/doc")
+                        mock_close_browser.assert_called_once_with(
+                            mock_playwright, mock_browser, mock_context, mock_page
+                        )

@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
-[![Selenium](https://img.shields.io/badge/Selenium-4.0%2B-green)](https://www.selenium.dev/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.40%2B-green)](https://playwright.dev/)
 [![MCP](https://img.shields.io/badge/MCP-1.6%2B-purple)](https://modelcontextprotocol.io/)
 
 一个基于Model Context Protocol (MCP)的服务器，用于自动化搜索和从Red Hat客户门户提取数据。
@@ -10,6 +10,7 @@
 ## 功能特点
 
 - 基于MCP协议的标准服务器，可与Claude等LLM集成
+- 使用Playwright实现高效的浏览器自动化
 - 自动登录到Red Hat客户门户
 - 可配置的搜索参数（查询、产品、文档类型、分页）
 - 结果提取与可配置的排序选项
@@ -22,9 +23,9 @@
 ## 系统要求
 
 - Python 3.10+
-- Chrome/Chromium浏览器
-- 必要的Python包（见`pyproject.toml`）
+- 必要的Python包（见`requirements.txt`）
 - MCP SDK 1.6+
+- Playwright 1.40+（会自动安装浏览器）
 
 ## 安装
 
@@ -178,6 +179,10 @@ document_types = mcp.resources["config://doc-types"]
 ### 运行测试
 
 ```bash
+# 安装测试依赖
+uv pip install -e ".[dev]"
+python -m playwright install
+
 # 运行所有测试
 uv run pytest
 
@@ -186,6 +191,23 @@ uv run pytest tests/test_auth.py
 
 # 运行测试并生成覆盖率报告
 uv run pytest --cov=woodgate --cov-report=term-missing
+
+# 运行Playwright测试
+uv run pytest tests/test_with_playwright_fixtures.py
+
+# 运行Playwright测试并指定浏览器
+uv run pytest tests/test_with_playwright_fixtures.py --browser firefox
+
+# 运行Playwright测试并启用有头模式
+uv run pytest tests/test_with_playwright_fixtures.py --headed
+
+# 运行Playwright测试并启用调试模式
+PWDEBUG=1 uv run pytest tests/test_with_playwright_fixtures.py
+
+# 运行Playwright测试并生成跟踪文件
+uv run pytest tests/test_with_playwright_fixtures.py
+# 查看跟踪文件
+playwright show-trace trace.zip
 ```
 
 当前项目测试覆盖率为79%，超过了目标的70%。

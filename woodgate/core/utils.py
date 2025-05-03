@@ -1,14 +1,13 @@
 """
 工具函数模块 - 提供各种辅助功能
+使用Playwright替代Selenium实现更高效的浏览器自动化
 """
 
 import logging
 import time
-from typing import Dict, Any
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+import json
+from typing import Dict, Any, List, Optional
+from playwright.async_api import Page, BrowserContext
 
 logger = logging.getLogger(__name__)
 
@@ -38,16 +37,18 @@ def log_step(message: str):
     logger.info(f"[{current_time}] {message}")
 
 
-def print_cookies(driver: webdriver.Chrome, step_name: str = ""):
+async def print_cookies(context: BrowserContext, step_name: str = ""):
     """
     打印当前浏览器中的所有Cookie信息
 
     Args:
-        driver (WebDriver): Selenium WebDriver实例
+        context (BrowserContext): Playwright浏览器上下文
         step_name (str): 当前步骤名称，用于日志
     """
     log_step(f"===== Cookie诊断信息 ({step_name}) =====")
-    cookies = driver.get_cookies()
+
+    # 获取所有cookies
+    cookies = await context.cookies()
     log_step(f"共有 {len(cookies)} 个Cookie")
 
     auth_cookies = []
@@ -79,13 +80,13 @@ def print_cookies(driver: webdriver.Chrome, step_name: str = ""):
     log_step("============================")
 
 
-async def handle_cookie_popup(driver: webdriver.Chrome, timeout: float = 0.5) -> bool:
+async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
     """
     处理网页上出现的cookie或隐私弹窗
 
     Args:
-        driver (WebDriver): Selenium WebDriver实例
-        timeout (float, optional): 等待弹窗出现的超时时间. Defaults to 0.5.
+        page (Page): Playwright页面实例
+        timeout (float, optional): 等待弹窗出现的超时时间(秒). Defaults to 1.0.
 
     Returns:
         bool: 如果成功处理了弹窗返回True，否则返回False
@@ -93,66 +94,96 @@ async def handle_cookie_popup(driver: webdriver.Chrome, timeout: float = 0.5) ->
     log_step("检查是否存在cookie通知...")
 
     try:
+        # 设置较短的超时时间，避免在没有弹窗的情况下等待太久
+        page.set_default_timeout(timeout * 1000)  # 转换为毫秒
+
         # 优化：使用更高效的CSS选择器，减少DOM查询次数
         popup_selectors = [
             "#onetrust-banner-sdk",  # 最常见的
             ".pf-c-modal-box",  # Red Hat特有的
             "[role='dialog'][aria-modal='true']",  # 通用备选
+            ".cookie-banner",  # 通用cookie横幅
+            "#cookie-notice",  # 另一种常见的cookie通知
         ]
 
-        cookie_notice = None
+        # 检查是否存在cookie通知
         for selector in popup_selectors:
             try:
-                cookie_notice = WebDriverWait(driver, timeout).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, selector))
-                )
-                log_step(f"发现cookie通知，使用选择器: {selector}")
-                break
+                # 使用waitForSelector而不是等待元素可见，提高效率
+                cookie_notice = await page.wait_for_selector(selector, timeout=timeout * 1000, state="attached")
+                if cookie_notice:
+                    log_step(f"发现cookie通知，使用选择器: {selector}")
+
+                    # 优化：减少选择器数量，优先使用更常见的按钮选择器
+                    close_buttons = [
+                        "button.pf-c-button[aria-label='Close']",
+                        "#onetrust-accept-btn-handler",
+                        "button.pf-c-button.pf-m-primary",
+                        ".close-button",
+                        "button[aria-label='Close']",
+                    ]
+
+                    # 先尝试在cookie通知元素内查找关闭按钮
+                    for btn_selector in close_buttons:
+                        try:
+                            # 在cookie通知内查找按钮
+                            close_button = await cookie_notice.query_selector(btn_selector)
+                            if close_button:
+                                log_step(f"在cookie通知中找到关闭按钮，使用选择器: {btn_selector}")
+                                await close_button.click()
+                                log_step("已点击关闭按钮")
+                                # 恢复默认超时时间
+                                page.set_default_timeout(30000)
+                                return True
+                        except Exception:
+                            continue
+
+                    # 尝试通过文本内容查找按钮
+                    for button_text in ["Accept", "I agree", "Close", "OK", "接受", "同意", "关闭"]:
+                        try:
+                            # 使用text=按钮文本定位
+                            button = await page.get_by_text(button_text, exact=False).first()
+                            if button:
+                                await button.click(timeout=1000)
+                                log_step(f"找到并点击了文本为'{button_text}'的按钮")
+                            # 恢复默认超时时间
+                            page.set_default_timeout(30000)
+                            return True
+                        except Exception:
+                            continue
+
+                    # 如果上述方法都失败，尝试使用JavaScript点击
+                    try:
+                        await page.evaluate(f"""
+                            const buttons = Array.from(document.querySelectorAll('button'));
+                            const acceptButton = buttons.find(button =>
+                                button.textContent.toLowerCase().includes('accept') ||
+                                button.textContent.toLowerCase().includes('agree') ||
+                                button.textContent.toLowerCase().includes('close') ||
+                                button.textContent.toLowerCase().includes('ok') ||
+                                button.textContent.toLowerCase().includes('接受') ||
+                                button.textContent.toLowerCase().includes('同意') ||
+                                button.textContent.toLowerCase().includes('关闭')
+                            );
+                            if (acceptButton) acceptButton.click();
+                        """)
+                        log_step("已使用JavaScript尝试点击按钮")
+                        # 恢复默认超时时间
+                        page.set_default_timeout(30000)
+                        return True
+                    except Exception:
+                        pass
             except Exception:
                 continue
 
-        if not cookie_notice:
-            log_step("未发现cookie通知")
-            return False
-
-        # 优化：减少选择器数量，优先使用更常见的按钮选择器
-        close_buttons = [
-            "button.pf-c-button[aria-label='Close']",
-            "#onetrust-accept-btn-handler",
-            "button.pf-c-button.pf-m-primary",
-            ".close-button",
-            "button[aria-label='Close']",
-        ]
-
-        # 先尝试在cookie通知元素内查找关闭按钮
-        for selector in close_buttons:
-            try:
-                close_button = cookie_notice.find_element(By.CSS_SELECTOR, selector)
-                log_step(f"在cookie通知中找到关闭按钮，使用选择器: {selector}")
-                # 使用JavaScript点击避免元素被拦截问题
-                driver.execute_script("arguments[0].click();", close_button)
-                log_step("已使用JavaScript点击关闭按钮")
-                return True
-            except Exception:
-                continue
-
-        # 尝试通过文本内容查找按钮
-        for button_text in ["Accept", "I agree", "Close", "OK", "接受", "同意", "关闭"]:
-            try:
-                button = driver.find_element(
-                    By.XPATH, f"//button[contains(text(), '{button_text}')]"
-                )
-                log_step(f"找到文本为'{button_text}'的按钮")
-                driver.execute_script("arguments[0].click();", button)
-                log_step("已使用JavaScript点击按钮")
-                return True
-            except Exception:
-                continue
-
-        log_step("无法找到关闭按钮，可能需要手动关闭")
+        # 恢复默认超时时间
+        page.set_default_timeout(30000)
+        log_step("未发现cookie通知")
         return False
 
     except Exception as e:
+        # 恢复默认超时时间
+        page.set_default_timeout(30000)
         log_step(f"处理cookie通知时出错: {e}")
         return False
 

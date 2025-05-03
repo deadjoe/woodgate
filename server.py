@@ -1,5 +1,6 @@
 """
 MCP服务器模块 - 实现Model Context Protocol服务器
+使用Playwright替代Selenium实现更高效的浏览器自动化
 """
 
 import os
@@ -8,7 +9,9 @@ import logging
 import asyncio
 import subprocess
 import importlib.util
-from typing import List, Dict, Any, Optional
+import traceback
+import urllib.parse
+from typing import List, Dict, Any, Optional, Tuple
 
 # 环境变量应该在运行时设置，而不是硬编码在代码中
 # 例如: export REDHAT_USERNAME="your_username" && export REDHAT_PASSWORD="your_password"
@@ -23,7 +26,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # 检查并安装必要的依赖
-required_packages = ["selenium", "webdriver-manager", "httpx"]
+required_packages = ["playwright", "httpx"]
 
 for package in required_packages:
     if importlib.util.find_spec(package) is None:
@@ -33,17 +36,47 @@ for package in required_packages:
             try:
                 subprocess.check_call(["uv", "pip", "install", package])
                 logger.info(f"{package} 使用uv安装成功")
+
+                # 如果是playwright，还需要安装浏览器
+                if package == "playwright":
+                    logger.info("安装Playwright浏览器...")
+                    try:
+                        subprocess.check_call(["playwright", "install", "chromium"])
+                        logger.info("Playwright浏览器安装成功")
+                    except Exception as e:
+                        logger.warning(f"安装Playwright浏览器失败: {e}")
+                        logger.warning("尝试使用Python模块安装浏览器...")
+                        subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+                        logger.info("Playwright浏览器安装成功")
             except Exception as e1:
                 logger.warning(f"使用uv安装 {package} 失败: {e1}")
                 # 尝试使用pip安装
                 try:
                     subprocess.check_call([sys.executable, "-m", "pip", "install", package])
                     logger.info(f"{package} 使用pip安装成功")
+
+                    # 如果是playwright，还需要安装浏览器
+                    if package == "playwright":
+                        logger.info("安装Playwright浏览器...")
+                        try:
+                            subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+                            logger.info("Playwright浏览器安装成功")
+                        except Exception as e:
+                            logger.warning(f"安装Playwright浏览器失败: {e}")
                 except Exception as e2:
                     logger.warning(f"使用pip安装 {package} 失败: {e2}")
                     # 尝试使用系统pip安装
                     subprocess.check_call(["pip", "install", package])
                     logger.info(f"{package} 使用系统pip安装成功")
+
+                    # 如果是playwright，还需要安装浏览器
+                    if package == "playwright":
+                        logger.info("安装Playwright浏览器...")
+                        try:
+                            subprocess.check_call(["playwright", "install", "chromium"])
+                            logger.info("Playwright浏览器安装成功")
+                        except Exception as e:
+                            logger.warning(f"安装Playwright浏览器失败: {e}")
         except Exception as e:
             logger.error(f"安装 {package} 失败: {e}")
             logger.error("继续执行，但可能会导致功能不正常")
@@ -51,12 +84,7 @@ for package in required_packages:
 # 导入必要的模块
 try:
     from mcp.server.fastmcp import FastMCP
-    from selenium import webdriver
-    from selenium.webdriver.chrome.service import Service as ChromeService
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from webdriver_manager.chrome import ChromeDriverManager
+    from playwright.async_api import async_playwright, Browser, Page, BrowserContext, Playwright
 except ImportError as e:
     logger.error(f"导入错误: {e}")
     raise
@@ -68,6 +96,8 @@ mcp = FastMCP("Woodgate", description="Red Hat客户门户搜索工具")
 REDHAT_PORTAL_URL = "https://access.redhat.com"
 REDHAT_LOGIN_URL = "https://sso.redhat.com/auth/realms/redhat-external/login-actions/authenticate"
 REDHAT_SEARCH_URL = "https://access.redhat.com/search"
+REDHAT_DIRECT_LOGIN_URL = "https://access.redhat.com/login"
+ALERTS_BASE_URL = "https://access.redhat.com/security/security-updates/"
 
 
 # 获取凭据
@@ -83,199 +113,373 @@ def get_credentials():
 
 
 # 初始化浏览器
-async def initialize_browser():
-    """初始化Chrome浏览器"""
-    logger.debug("初始化Chrome浏览器...")
+async def initialize_browser() -> Tuple[Playwright, Browser, BrowserContext, Page]:
+    """
+    初始化Playwright浏览器
+
+    Returns:
+        Tuple[Playwright, Browser, BrowserContext, Page]: 包含Playwright实例、浏览器实例、浏览器上下文和页面的元组
+    """
+    logger.debug("初始化Playwright浏览器...")
 
     try:
-        # 配置Chrome选项 - 优化浏览器性能
-        options = webdriver.ChromeOptions()
-        options.add_argument("--headless")  # 启用无头模式
-        options.add_argument("--disable-gpu")  # 禁用GPU加速
-        options.add_argument("--no-sandbox")  # 禁用沙箱
-        options.add_argument("--disable-dev-shm-usage")  # 解决低内存环境中的崩溃问题
-        options.add_argument("--window-size=1920,1080")  # 设置窗口大小
-        options.add_argument("--disable-extensions")  # 禁用扩展
-        options.add_argument("--disable-infobars")  # 禁用信息栏
-        options.add_argument("--disable-notifications")  # 禁用通知
-        options.add_argument("--blink-settings=imagesEnabled=false")  # 禁用图片加载
-        options.page_load_strategy = "eager"  # 使用eager加载策略
+        # 启动Playwright
+        playwright = await async_playwright().start()
 
-        # 安全地获取事件循环并创建浏览器
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # 如果事件循环正在运行，使用run_in_executor
-                driver = await loop.run_in_executor(
-                    None,
-                    lambda: webdriver.Chrome(
-                        service=ChromeService(ChromeDriverManager().install()), options=options
-                    ),
-                )
-            else:
-                # 如果事件循环未运行，直接创建浏览器
-                driver = webdriver.Chrome(
-                    service=ChromeService(ChromeDriverManager().install()), options=options
-                )
-        except RuntimeError:
-            # 如果无法获取事件循环，创建一个新的
-            logger.warning("无法获取事件循环，创建新的浏览器实例")
-            driver = webdriver.Chrome(
-                service=ChromeService(ChromeDriverManager().install()), options=options
-            )
+        # 启动浏览器，配置优化选项
+        browser = await playwright.chromium.launch(
+            headless=True,  # 启用无头模式，不显示浏览器窗口，提高运行效率
+            args=[
+                "--no-sandbox",  # 禁用沙箱，解决某些环境下的权限问题
+                "--disable-dev-shm-usage",  # 解决在低内存环境中的崩溃问题
+                "--disable-extensions",  # 禁用扩展，减少资源占用和干扰
+                "--disable-gpu",  # 禁用GPU加速，提高在服务器环境下的兼容性
+                "--disable-notifications",  # 禁用通知，避免弹窗干扰
+            ]
+        )
 
-        # 设置页面加载超时时间
-        driver.set_page_load_timeout(20)
-        # 设置脚本执行超时时间
-        driver.set_script_timeout(10)
+        # 创建浏览器上下文，配置视口大小和其他选项
+        context = await browser.new_context(
+            viewport={"width": 1920, "height": 1080},  # 设置窗口大小，模拟标准显示器分辨率
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # 设置用户代理
+            ignore_https_errors=True,  # 忽略HTTPS错误，提高兼容性
+            java_script_enabled=True,  # 启用JavaScript
+            has_touch=False,  # 禁用触摸，模拟桌面环境
+        )
+
+        # 创建页面
+        page = await context.new_page()
+
+        # 配置页面选项
+        await page.route("**/*.{png,jpg,jpeg,gif,svg}", lambda route: route.abort())  # 阻止加载图片，提高性能
+        await page.set_default_timeout(20000)  # 设置默认超时时间为20秒
+        await page.set_default_navigation_timeout(30000)  # 设置导航超时时间为30秒
 
         logger.debug("浏览器初始化完成")
-        return driver
+        return playwright, browser, context, page
     except Exception as e:
         logger.error(f"浏览器初始化失败: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         raise
 
 
-# 处理Cookie弹窗
-async def handle_cookie_popup(driver):
-    """处理Cookie弹窗"""
+# 关闭浏览器
+async def close_browser(
+    playwright: Optional[Playwright] = None,
+    browser: Optional[Browser] = None,
+    context: Optional[BrowserContext] = None,
+    page: Optional[Page] = None
+) -> None:
+    """
+    安全关闭浏览器及相关资源
+
+    Args:
+        playwright: Playwright实例
+        browser: 浏览器实例
+        context: 浏览器上下文
+        page: 页面实例
+    """
     try:
-        # 等待Cookie弹窗出现
-        cookie_button = WebDriverWait(driver, 5).until(
-            EC.presence_of_element_located((By.ID, "truste-consent-button"))
-        )
-        cookie_button.click()
-        await asyncio.sleep(1)
-        return True
-    except Exception:
-        # 如果没有Cookie弹窗，继续
+        if page:
+            await page.close()
+            logger.debug("页面已关闭")
+
+        if context:
+            await context.close()
+            logger.debug("浏览器上下文已关闭")
+
+        if browser:
+            await browser.close()
+            logger.debug("浏览器已关闭")
+
+        if playwright:
+            await playwright.stop()
+            logger.debug("Playwright已停止")
+
+        logger.debug("浏览器资源已完全释放")
+    except Exception as e:
+        logger.warning(f"关闭浏览器时出错: {e}")
+        logger.debug(f"错误堆栈: {traceback.format_exc()}")
+
+
+# 处理Cookie弹窗
+async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
+    """
+    处理网页上出现的cookie或隐私弹窗
+
+    Args:
+        page (Page): Playwright页面实例
+        timeout (float, optional): 等待弹窗出现的超时时间(秒). Defaults to 1.0.
+
+    Returns:
+        bool: 如果成功处理了弹窗返回True，否则返回False
+    """
+    logger.debug("检查是否存在cookie通知...")
+
+    try:
+        # 设置较短的超时时间，避免在没有弹窗的情况下等待太久
+        original_timeout = page.get_default_timeout()
+        page.set_default_timeout(timeout * 1000)  # 转换为毫秒
+
+        # 优化：使用更高效的CSS选择器，减少DOM查询次数
+        popup_selectors = [
+            "#truste-consent-button",  # Red Hat特有的
+            "#onetrust-banner-sdk",  # 最常见的
+            ".pf-c-modal-box",  # Red Hat特有的
+            "[role='dialog'][aria-modal='true']",  # 通用备选
+            ".cookie-banner",  # 通用cookie横幅
+            "#cookie-notice",  # 另一种常见的cookie通知
+        ]
+
+        # 检查是否存在cookie通知
+        for selector in popup_selectors:
+            try:
+                # 使用waitForSelector而不是等待元素可见，提高效率
+                cookie_notice = await page.wait_for_selector(selector, timeout=timeout * 1000, state="attached")
+                if cookie_notice:
+                    logger.debug(f"发现cookie通知，使用选择器: {selector}")
+                    await cookie_notice.click()
+                    logger.debug("已点击关闭按钮")
+                    # 恢复默认超时时间
+                    page.set_default_timeout(original_timeout)
+                    return True
+            except Exception:
+                continue
+
+        # 尝试通过文本内容查找按钮
+        for button_text in ["Accept", "I agree", "Close", "OK", "接受", "同意", "关闭"]:
+            try:
+                # 使用text=按钮文本定位
+                button = await page.get_by_text(button_text, exact=False).first()
+                if button:
+                    await button.click(timeout=1000)
+                    logger.debug(f"找到并点击了文本为'{button_text}'的按钮")
+                # 恢复默认超时时间
+                page.set_default_timeout(original_timeout)
+                return True
+            except Exception:
+                continue
+
+        # 恢复默认超时时间
+        page.set_default_timeout(original_timeout)
+        logger.debug("未发现cookie通知")
+        return False
+
+    except Exception as e:
+        # 恢复默认超时时间
+        page.set_default_timeout(30000)
+        logger.debug(f"处理cookie通知时出错: {e}")
         return False
 
 
 # 登录到Red Hat客户门户
-async def login_to_redhat_portal(driver, username, password):
-    """登录到Red Hat客户门户"""
+async def login_to_redhat_portal(page: Page, context: BrowserContext, username: str, password: str) -> bool:
+    """
+    登录到Red Hat客户门户
+
+    Args:
+        page (Page): Playwright页面实例
+        context (BrowserContext): Playwright浏览器上下文
+        username (str): Red Hat账号用户名
+        password (str): Red Hat账号密码
+
+    Returns:
+        bool: 登录成功返回True，否则返回False
+    """
     try:
         # 访问Red Hat客户门户
-        driver.get(REDHAT_PORTAL_URL)
+        await page.goto(REDHAT_PORTAL_URL, wait_until="networkidle")
+        logger.debug("已加载Red Hat客户门户首页")
 
         # 处理Cookie弹窗
-        await handle_cookie_popup(driver)
+        await handle_cookie_popup(page)
 
         # 点击登录按钮
         try:
-            login_button = WebDriverWait(driver, 10).until(
-                EC.element_to_be_clickable((By.LINK_TEXT, "Log In"))
-            )
-            login_button.click()
-        except Exception:
-            # 可能已经在登录页面
-            pass
+            login_button = await page.get_by_text("Log In", exact=True).first()
+            if login_button:
+                await login_button.click()
+                logger.debug("已点击登录按钮")
+            else:
+                # 尝试使用链接选择器
+                login_locator = page.locator("a[href*='login']")
+                if await login_locator.count() > 0:
+                    await login_locator.first().click()
+                    logger.debug("已点击登录链接")
+        except Exception as e:
+            logger.debug(f"点击登录按钮时出错: {e}，可能已经在登录页面")
+            # 可能已经在登录页面，尝试直接访问登录页面
+            await page.goto(REDHAT_DIRECT_LOGIN_URL, wait_until="networkidle")
 
         # 输入用户名
-        username_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "username"))
-        )
-        username_input.clear()
-        username_input.send_keys(username)
+        username_field = await page.wait_for_selector("#username", state="visible", timeout=10000)
+        if username_field:
+            await username_field.fill("")  # 清空
+            await username_field.fill(username)  # 输入
+            logger.debug("已输入用户名")
+        else:
+            logger.warning("未找到用户名输入框")
+            return False
 
-        # 点击下一步
-        next_button = driver.find_element(By.ID, "login-show-step2")
-        next_button.click()
+        # 点击下一步按钮（如果存在）
+        try:
+            next_button = await page.wait_for_selector("#login-show-step2", state="visible", timeout=3000)
+            if next_button:
+                await next_button.click()
+                logger.debug("已点击下一步按钮")
+        except Exception:
+            logger.debug("未找到下一步按钮，可能是单步登录页面")
 
         # 输入密码
-        password_input = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "password"))
-        )
-        password_input.clear()
-        password_input.send_keys(password)
+        password_field = await page.wait_for_selector("#password", state="visible", timeout=10000)
+        if password_field:
+            await password_field.fill("")  # 清空
+            await password_field.fill(password)  # 输入
+            logger.debug("已输入密码")
+        else:
+            logger.warning("未找到密码输入框")
+            return False
 
-        # 点击登录
-        login_submit = driver.find_element(By.ID, "kc-login")
-        login_submit.click()
+        # 点击登录按钮
+        login_button = await page.wait_for_selector("#kc-login", state="visible", timeout=5000)
+        if login_button:
+            await login_button.click()
+            logger.debug("已点击登录按钮")
+        else:
+            logger.warning("未找到登录按钮")
+            return False
 
         # 等待登录完成
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "pf-c-page__header"))
-        )
+        try:
+            await page.wait_for_selector(".pf-c-page__header", state="visible", timeout=20000)
+            logger.debug("登录成功！已检测到页面头部")
+            return True
+        except Exception as e:
+            logger.error(f"等待登录完成时出错: {e}")
 
-        return True
+            # 检查是否有错误消息
+            try:
+                error_selector = ".kc-feedback-text, .alert-error, .pf-c-alert__title"
+                error_element = await page.wait_for_selector(error_selector, state="visible", timeout=3000)
+                if error_element:
+                    error_text = await error_element.text_content()
+                    logger.error(f"登录失败: {error_text}")
+            except Exception:
+                pass
+
+            return False
+
     except Exception as e:
-        logger.error(f"登录失败: {e}")
+        logger.error(f"登录过程中出错: {e}")
+        logger.debug(f"错误堆栈: {traceback.format_exc()}")
         return False
 
 
 # 执行搜索
 async def perform_search(
-    driver, query, products=None, doc_types=None, page=1, rows=20, sort_by="relevant"
-):
-    """在Red Hat客户门户执行搜索"""
+    page: Page, query: str, products=None, doc_types=None, page_num: int = 1, rows: int = 20, sort_by: str = "relevant"
+) -> List[Dict[str, Any]]:
+    """
+    在Red Hat客户门户执行搜索
+
+    Args:
+        page (Page): Playwright页面实例
+        query (str): 搜索关键词
+        products (List[str], optional): 要搜索的产品列表. Defaults to None.
+        doc_types (List[str], optional): 文档类型列表. Defaults to None.
+        page_num (int, optional): 页码. Defaults to 1.
+        rows (int, optional): 每页结果数. Defaults to 20.
+        sort_by (str, optional): 排序方式. Defaults to "relevant".
+
+    Returns:
+        List[Dict[str, Any]]: 搜索结果列表
+    """
     try:
         # 构建搜索URL
-        search_url = f"{REDHAT_SEARCH_URL}?q={query}&p={page}&rows={rows}&sort={sort_by}"
+        encoded_query = urllib.parse.quote(query)
+        search_url = f"{REDHAT_SEARCH_URL}?q={encoded_query}&p={page_num}&rows={rows}&sort={sort_by}"
 
         # 添加产品过滤
         if products:
             for product in products:
-                search_url += f"&product={product}"
+                encoded_product = urllib.parse.quote(product)
+                search_url += f"&product={encoded_product}"
 
         # 添加文档类型过滤
         if doc_types:
             for doc_type in doc_types:
-                search_url += f"&documentKind={doc_type}"
+                encoded_doc_type = urllib.parse.quote(doc_type)
+                search_url += f"&documentKind={encoded_doc_type}"
+
+        logger.debug(f"搜索URL: {search_url}")
 
         # 访问搜索页面
-        driver.get(search_url)
+        await page.goto(search_url, wait_until="networkidle")
+        logger.debug("已加载搜索页面")
+
+        # 处理可能出现的Cookie弹窗
+        await handle_cookie_popup(page)
 
         # 等待搜索结果加载
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "pf-c-page__main-section"))
-        )
+        try:
+            await page.wait_for_selector(".pf-c-page__main-section", state="visible", timeout=20000)
+            logger.debug("页面主体已加载")
+        except Exception as e:
+            logger.error(f"等待页面加载时出错: {e}")
+            return []
 
         # 检查是否有搜索结果
         try:
-            driver.find_element(By.CLASS_NAME, "pf-c-card")
-        except Exception:
-            # 没有搜索结果
+            result_count = await page.query_selector_all(".pf-c-card, .search-result")
+            if not result_count:
+                logger.debug("未找到搜索结果")
+                return []
+            logger.debug(f"找到 {len(result_count)} 个搜索结果")
+        except Exception as e:
+            logger.error(f"检查搜索结果时出错: {e}")
             return []
 
         # 提取搜索结果
         results = []
-        result_elements = driver.find_elements(By.CSS_SELECTOR, ".pf-c-card__body")
+        result_elements = await page.query_selector_all(".pf-c-card, .search-result")
 
         for element in result_elements:
             try:
                 # 提取标题和URL
-                title_element = element.find_element(By.CSS_SELECTOR, "h2 a")
-                title = title_element.text.strip()
-                url = title_element.get_attribute("href")
+                title_element = await element.query_selector("h2 a, .pf-c-title a")
+                if not title_element:
+                    continue
+
+                title = await title_element.text_content()
+                title = title.strip() if title else "未知标题"
+                url = await title_element.get_attribute("href")
 
                 # 提取摘要
-                try:
-                    summary_element = element.find_element(
-                        By.CSS_SELECTOR, ".co-search-result__description"
-                    )
-                    summary = summary_element.text.strip()
-                except Exception:
-                    summary = "无摘要"
+                summary = "无摘要"
+                summary_element = await element.query_selector(
+                    ".co-search-result__description, .search-result-content, .pf-c-card__body"
+                )
+                if summary_element:
+                    summary_text = await summary_element.text_content()
+                    summary = summary_text.strip() if summary_text else "无摘要"
 
                 # 提取文档类型
-                try:
-                    doc_type_element = element.find_element(
-                        By.CSS_SELECTOR, ".co-search-result__kind"
-                    )
-                    doc_type = doc_type_element.text.strip()
-                except Exception:
-                    doc_type = "未知"
+                doc_type = "未知类型"
+                doc_type_element = await element.query_selector(
+                    ".co-search-result__kind, .search-result-info span, .pf-c-label"
+                )
+                if doc_type_element:
+                    doc_type_text = await doc_type_element.text_content()
+                    doc_type = doc_type_text.strip() if doc_type_text else "未知类型"
 
                 # 提取最后更新时间
-                try:
-                    date_element = element.find_element(By.CSS_SELECTOR, ".co-search-result__date")
-                    last_updated = date_element.text.strip()
-                except Exception:
-                    last_updated = "未知"
+                last_updated = "未知日期"
+                date_element = await element.query_selector(
+                    ".co-search-result__date, .search-result-info time, .pf-c-label[data-testid='date']"
+                )
+                if date_element:
+                    date_text = await date_element.text_content()
+                    last_updated = date_text.strip() if date_text else "未知日期"
 
                 results.append(
                     {
@@ -288,61 +492,92 @@ async def perform_search(
                 )
             except Exception as e:
                 logger.error(f"提取搜索结果时出错: {e}")
+                logger.debug(f"错误堆栈: {traceback.format_exc()}")
+                continue
 
+        logger.debug(f"成功提取 {len(results)} 个搜索结果")
         return results
     except Exception as e:
         logger.error(f"执行搜索时出错: {e}")
+        logger.debug(f"错误堆栈: {traceback.format_exc()}")
         return []
 
 
 # 获取产品警报
-async def get_product_alerts(driver, product):
-    """获取特定产品的警报信息"""
+async def get_product_alerts(page: Page, product: str) -> List[Dict[str, Any]]:
+    """
+    获取特定产品的警报信息
+
+    Args:
+        page (Page): Playwright页面实例
+        product (str): 产品名称
+
+    Returns:
+        List[Dict[str, Any]]: 警报信息列表
+    """
     try:
         # 构建警报URL
-        alerts_url = f"{REDHAT_PORTAL_URL}/products/{product}/alerts"
+        encoded_product = urllib.parse.quote(product)
+        alerts_url = f"{REDHAT_PORTAL_URL}/products/{encoded_product}/alerts"
+        logger.debug(f"警报URL: {alerts_url}")
 
         # 访问警报页面
-        driver.get(alerts_url)
+        await page.goto(alerts_url, wait_until="networkidle")
+        logger.debug("已加载警报页面")
+
+        # 处理可能出现的Cookie弹窗
+        await handle_cookie_popup(page)
 
         # 等待警报加载
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "pf-c-page__main-section"))
-        )
+        try:
+            await page.wait_for_selector(".pf-c-page__main-section", state="visible", timeout=20000)
+            logger.debug("页面主体已加载")
+        except Exception as e:
+            logger.error(f"等待页面加载时出错: {e}")
+            return []
 
         # 提取警报信息
         alerts = []
-        alert_elements = driver.find_elements(By.CSS_SELECTOR, ".pf-c-card")
+        alert_elements = await page.query_selector_all(".pf-c-card, .portal-advisory")
+        logger.debug(f"找到 {len(alert_elements)} 个警报元素")
 
         for element in alert_elements:
             try:
                 # 提取标题和URL
-                title_element = element.find_element(By.CSS_SELECTOR, "h2 a")
-                title = title_element.text.strip()
-                url = title_element.get_attribute("href")
+                title_element = await element.query_selector("h2 a, .pf-c-title a")
+                if not title_element:
+                    continue
+
+                title = await title_element.text_content()
+                title = title.strip() if title else "未知标题"
+                url = await title_element.get_attribute("href")
 
                 # 提取摘要
-                try:
-                    summary_element = element.find_element(
-                        By.CSS_SELECTOR, ".co-alert__description"
-                    )
-                    summary = summary_element.text.strip()
-                except Exception:
-                    summary = "无摘要"
+                summary = "无摘要"
+                summary_element = await element.query_selector(
+                    ".co-alert__description, .portal-advisory-synopsis, .pf-c-card__body"
+                )
+                if summary_element:
+                    summary_text = await summary_element.text_content()
+                    summary = summary_text.strip() if summary_text else "无摘要"
 
                 # 提取严重性
-                try:
-                    severity_element = element.find_element(By.CSS_SELECTOR, ".co-alert__severity")
-                    severity = severity_element.text.strip()
-                except Exception:
-                    severity = "未知"
+                severity = "未知严重性"
+                severity_element = await element.query_selector(
+                    ".co-alert__severity, .security-severity, .pf-c-label"
+                )
+                if severity_element:
+                    severity_text = await severity_element.text_content()
+                    severity = severity_text.strip() if severity_text else "未知严重性"
 
                 # 提取发布日期
-                try:
-                    date_element = element.find_element(By.CSS_SELECTOR, ".co-alert__date")
-                    published_date = date_element.text.strip()
-                except Exception:
-                    published_date = "未知"
+                published_date = "未知日期"
+                date_element = await element.query_selector(
+                    ".co-alert__date, .portal-advisory-date, time"
+                )
+                if date_element:
+                    date_text = await date_element.text_content()
+                    published_date = date_text.strip() if date_text else "未知日期"
 
                 alerts.append(
                     {
@@ -355,43 +590,89 @@ async def get_product_alerts(driver, product):
                 )
             except Exception as e:
                 logger.error(f"提取警报信息时出错: {e}")
+                logger.debug(f"错误堆栈: {traceback.format_exc()}")
+                continue
 
+        logger.debug(f"成功提取 {len(alerts)} 个警报")
         return alerts
     except Exception as e:
         logger.error(f"获取产品警报时出错: {e}")
+        logger.debug(f"错误堆栈: {traceback.format_exc()}")
         return []
 
 
 # 获取文档内容
-async def get_document_content(driver, document_url):
-    """获取特定文档的详细内容"""
+async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
+    """
+    获取特定文档的详细内容
+
+    Args:
+        page (Page): Playwright页面实例
+        document_url (str): 文档URL
+
+    Returns:
+        Dict[str, Any]: 文档内容
+    """
     try:
         # 访问文档页面
-        driver.get(document_url)
+        await page.goto(document_url, wait_until="networkidle")
+        logger.debug("已加载文档页面")
+
+        # 处理可能出现的Cookie弹窗
+        await handle_cookie_popup(page)
 
         # 等待文档加载
-        WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "pf-c-page__main-section"))
-        )
+        try:
+            await page.wait_for_selector(".pf-c-page__main-section", state="visible", timeout=20000)
+            logger.debug("页面主体已加载")
+        except Exception as e:
+            logger.error(f"等待页面加载时出错: {e}")
+            return {"error": "无法加载文档内容"}
 
         # 提取文档标题
-        try:
-            title_element = driver.find_element(By.CSS_SELECTOR, "h1")
-            title = title_element.text.strip()
-        except Exception:
-            title = "未知标题"
+        title = "未知标题"
+        title_element = await page.query_selector("h1, .pf-c-title")
+        if title_element:
+            title_text = await title_element.text_content()
+            title = title_text.strip() if title_text else "未知标题"
 
         # 提取文档内容
-        try:
-            content_element = driver.find_element(By.CSS_SELECTOR, ".pf-c-content")
-            content = content_element.text.strip()
-        except Exception:
-            content = "无法提取文档内容"
+        content = "无法提取文档内容"
+        content_element = await page.query_selector(".pf-c-content, .field-item, article")
+        if content_element:
+            content_text = await content_element.text_content()
+            content = content_text.strip() if content_text else "无法提取文档内容"
 
-        return {"title": title, "url": document_url, "content": content}
+        # 提取文档元数据
+        metadata = {}
+        try:
+            # 尝试提取各种可能的元数据字段
+            metadata_fields = await page.query_selector_all(".field, .pf-c-description-list__group")
+
+            for field in metadata_fields:
+                try:
+                    label_element = await field.query_selector(".field-label, .pf-c-description-list__term")
+                    value_element = await field.query_selector(".field-item, .pf-c-description-list__description")
+
+                    if label_element and value_element:
+                        label_text = await label_element.text_content()
+                        value_text = await value_element.text_content()
+
+                        label = label_text.strip().rstrip(":") if label_text else ""
+                        value = value_text.strip() if value_text else ""
+
+                        if label and value:
+                            metadata[label] = value
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning(f"提取文档元数据时出错: {e}")
+
+        return {"title": title, "url": document_url, "content": content, "metadata": metadata}
     except Exception as e:
         logger.error(f"获取文档内容时出错: {e}")
-        return {"title": "错误", "url": document_url, "content": f"获取文档内容时出错: {e}"}
+        logger.debug(f"错误堆栈: {traceback.format_exc()}")
+        return {"title": "错误", "url": document_url, "content": f"获取文档内容时出错: {str(e)}"}
 
 
 # 可用产品列表
@@ -464,10 +745,14 @@ async def search(
         f"搜索函数开始执行，参数: query='{query}', products={products}, doc_types={doc_types}, page={page}, rows={rows}, sort_by='{sort_by}'"
     )
 
+    playwright = None
     browser = None
+    context = None
+    page_obj = None
+
     try:
         logger.debug("初始化浏览器...")
-        browser = await initialize_browser()
+        playwright, browser, context, page_obj = await initialize_browser()
         logger.debug("浏览器初始化成功")
 
         logger.debug("获取凭据...")
@@ -475,7 +760,7 @@ async def search(
         logger.debug(f"凭据获取成功: username='{username}'")
 
         logger.debug("登录到Red Hat客户门户...")
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = await login_to_redhat_portal(page_obj, context, username, password)
         logger.debug(f"登录结果: {login_success}")
 
         if not login_success:
@@ -484,11 +769,11 @@ async def search(
 
         logger.debug("执行搜索...")
         results = await perform_search(
-            browser,
+            page_obj,
             query=query,
             products=products or [],
             doc_types=doc_types or [],
-            page=page,
+            page_num=page,
             rows=rows,
             sort_by=sort_by,
         )
@@ -496,20 +781,14 @@ async def search(
         return results
     except Exception as e:
         logger.error(f"搜索过程中出错: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return [{"error": f"搜索过程中出错: {str(e)}"}]
     finally:
         try:
             # 安全地关闭浏览器
-            if browser:
-                logger.debug("关闭浏览器...")
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
-                logger.debug("浏览器已关闭")
+            logger.debug("关闭浏览器...")
+            await close_browser(playwright, browser, context, page_obj)
+            logger.debug("浏览器已关闭")
         except Exception as e:
             logger.warning(f"关闭浏览器时出错: {e}")
 
@@ -527,32 +806,28 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
     """
     logger.info(f"获取产品警报: '{product}'")
 
+    playwright = None
     browser = None
+    context = None
+    page_obj = None
+
     try:
-        browser = await initialize_browser()
+        playwright, browser, context, page_obj = await initialize_browser()
         username, password = get_credentials()
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = await login_to_redhat_portal(page_obj, context, username, password)
         if not login_success:
             return [{"error": "登录失败，请检查凭据"}]
 
-        alerts = await get_product_alerts(browser, product)
+        alerts = await get_product_alerts(page_obj, product)
         return alerts
     except Exception as e:
         logger.error(f"获取警报过程中出错: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return [{"error": f"获取警报过程中出错: {str(e)}"}]
     finally:
         try:
             # 安全地关闭浏览器
-            if browser:
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
-            else:
-                logger.warning("浏览器实例为None，无需关闭")
+            await close_browser(playwright, browser, context, page_obj)
         except Exception as e:
             logger.warning(f"关闭浏览器时出错: {e}")
 
@@ -570,32 +845,28 @@ async def get_document(document_url: str) -> Dict[str, Any]:
     """
     logger.info(f"获取文档内容: {document_url}")
 
+    playwright = None
     browser = None
+    context = None
+    page_obj = None
+
     try:
-        browser = await initialize_browser()
+        playwright, browser, context, page_obj = await initialize_browser()
         username, password = get_credentials()
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = await login_to_redhat_portal(page_obj, context, username, password)
         if not login_success:
             return {"error": "登录失败，请检查凭据"}
 
-        document = await get_document_content(browser, document_url)
+        document = await get_document_content(page_obj, document_url)
         return document
     except Exception as e:
         logger.error(f"获取文档内容过程中出错: {e}")
-        import traceback
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return {"error": f"获取文档内容过程中出错: {str(e)}"}
     finally:
         try:
             # 安全地关闭浏览器
-            if browser:
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
-            else:
-                logger.warning("浏览器实例为None，无需关闭")
+            await close_browser(playwright, browser, context, page_obj)
         except Exception as e:
             logger.warning(f"关闭浏览器时出错: {e}")
 

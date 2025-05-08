@@ -125,3 +125,33 @@ uv.lock
 
 # Backup files
 *.bak
+*.orig
+
+# Sensitive files
+redhat_credentials.txt
+*credentials*.txt
+*password*.txt
+*secret*.txt
+
+# Configuration files
+claude_desktop_config.json
+
+# Test scripts
+test_core_functionality.py
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg
+*.orig
+
+# Configuration files
+claude_desktop_config.json
+
+# Test scripts
+test_core_functionality.py
+
+# Screenshots
+*.png
+*.jpg
+*.jpeg

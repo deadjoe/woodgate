@@ -2,9 +2,9 @@
 主模块测试
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from woodgate.__main__ import parse_args, main
+from woodgate.__main__ import main, parse_args
 
 
 def test_parse_args_defaults():

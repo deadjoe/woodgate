@@ -2,16 +2,18 @@
 Pytest配置文件
 """
 
-import pytest
 import os
-from typing import Dict, Any, Generator
-from playwright.sync_api import Browser, BrowserContext, Page, Playwright, sync_playwright
+from typing import Any, Dict, Generator
+
+import pytest
+from playwright.sync_api import BrowserContext, Page
 
 
 # 自定义命令行选项
 def pytest_addoption(parser):
     """添加自定义命令行选项"""
-    pass
+    parser.addoption("--headless", action="store_true", default=True, help="是否使用无头模式运行浏览器")
+    parser.addoption("--slow-mo", default="0", help="减慢浏览器操作的毫秒数")
 
 
 # 自定义浏览器固件

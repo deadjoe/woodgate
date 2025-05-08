@@ -16,7 +16,7 @@ def test_redhat_portal_title(page: Page):
     """测试Red Hat门户网站标题"""
     # 访问Red Hat门户网站
     page.goto("https://access.redhat.com/", wait_until="networkidle")
-    
+
     # 验证页面标题包含"Red Hat"
     expect(page).to_have_title(title_or_reg_exp="Red Hat")
 
@@ -25,20 +25,20 @@ def test_redhat_search_page(page: Page):
     """测试Red Hat搜索页面"""
     # 访问Red Hat搜索页面
     page.goto("https://access.redhat.com/search", wait_until="networkidle")
-    
+
     # 验证搜索框存在
     search_box = page.locator("input[name='q']")
     expect(search_box).to_be_visible()
-    
+
     # 在搜索框中输入关键词
     search_box.fill("kubernetes")
-    
+
     # 点击搜索按钮
     page.locator("button[type='submit']").click()
-    
+
     # 等待搜索结果加载
     page.wait_for_load_state("networkidle")
-    
+
     # 验证搜索结果页面包含搜索关键词
     expect(page.locator("body")).to_contain_text("kubernetes")
 
@@ -47,11 +47,11 @@ def test_redhat_products_page(page: Page):
     """测试Red Hat产品页面"""
     # 访问Red Hat产品页面
     page.goto("https://access.redhat.com/products", wait_until="networkidle")
-    
+
     # 验证页面包含产品列表
     product_list = page.locator(".product-listing")
     expect(product_list).to_be_visible()
-    
+
     # 验证页面包含常见产品
     expect(page.locator("body")).to_contain_text("Red Hat Enterprise Linux")
     expect(page.locator("body")).to_contain_text("Red Hat OpenShift")
@@ -62,19 +62,19 @@ def test_redhat_login_page(page: Page):
     """测试Red Hat登录页面"""
     # 访问Red Hat登录页面
     page.goto("https://access.redhat.com/login", wait_until="networkidle")
-    
+
     # 验证登录表单存在
     login_form = page.locator("#kc-form-login")
     expect(login_form).to_be_visible()
-    
+
     # 验证用户名输入框存在
     username_input = page.locator("#username")
     expect(username_input).to_be_visible()
-    
+
     # 验证密码输入框存在
     password_input = page.locator("#password")
     expect(password_input).to_be_visible()
-    
+
     # 验证登录按钮存在
     login_button = page.locator("#kc-login")
     expect(login_button).to_be_visible()
@@ -85,23 +85,23 @@ def test_search_with_tracing(page: Page, browser_context_args, browser_context):
     """使用跟踪功能测试搜索"""
     # 启用跟踪
     browser_context.tracing.start(screenshots=True, snapshots=True)
-    
+
     # 访问Red Hat搜索页面
     page.goto("https://access.redhat.com/search", wait_until="networkidle")
-    
+
     # 在搜索框中输入关键词
     search_box = page.locator("input[name='q']")
     search_box.fill("openshift troubleshooting")
-    
+
     # 点击搜索按钮
     page.locator("button[type='submit']").click()
-    
+
     # 等待搜索结果加载
     page.wait_for_load_state("networkidle")
-    
+
     # 验证搜索结果页面包含搜索关键词
     expect(page.locator("body")).to_contain_text("openshift")
-    
+
     # 停止跟踪并保存
     browser_context.tracing.stop(path="trace.zip")
 

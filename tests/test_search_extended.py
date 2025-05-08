@@ -2,16 +2,17 @@
 搜索模块扩展测试
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
-from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.common.by import By
 
 from woodgate.core.search import (
     extract_search_results,
-    perform_search,
-    get_product_alerts,
     get_document_content,
+    get_product_alerts,
+    perform_search,
 )
 
 

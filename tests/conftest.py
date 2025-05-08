@@ -12,7 +12,9 @@ from playwright.sync_api import BrowserContext, Page
 # 自定义命令行选项
 def pytest_addoption(parser):
     """添加自定义命令行选项"""
-    parser.addoption("--headless", action="store_true", default=True, help="是否使用无头模式运行浏览器")
+    parser.addoption(
+        "--headless", action="store_true", default=True, help="是否使用无头模式运行浏览器"
+    )
     parser.addoption("--slow-mo", default="0", help="减慢浏览器操作的毫秒数")
 
 
@@ -87,7 +89,7 @@ def authenticated_page(page: Page) -> Generator[Page, None, None]:
         )
         if cookie_notice:
             cookie_notice.click()
-    except:
+    except Exception:
         pass
 
     # 输入用户名
@@ -101,7 +103,7 @@ def authenticated_page(page: Page) -> Generator[Page, None, None]:
         next_button = page.wait_for_selector("#login-show-step2", state="visible", timeout=3000)
         if next_button:
             next_button.click()
-    except:
+    except Exception:
         pass
 
     # 输入密码

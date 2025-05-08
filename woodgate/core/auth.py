@@ -9,7 +9,7 @@ import traceback
 
 from playwright.async_api import BrowserContext, Page
 
-from .utils import log_step, print_cookies, handle_cookie_popup
+from .utils import log_step, print_cookies
 
 logger = logging.getLogger(__name__)
 

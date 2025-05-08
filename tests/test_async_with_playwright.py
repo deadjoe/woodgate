@@ -2,7 +2,6 @@
 使用pytest-playwright的异步测试
 """
 
-
 import pytest
 from playwright.async_api import Page, expect
 

@@ -5,9 +5,16 @@
 
 import logging
 import traceback
-from typing import Optional, Callable, Any
+from typing import Optional
 
-from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright, Locator
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    Page,
+    Playwright,
+    async_playwright,
+    Locator,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,25 +32,25 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
     # 常见的cookie横幅选择器，优化为只包含最常用和Red Hat特有的选择器
     cookie_banner_selectors = [
         "#truste-consent-track",  # Red Hat使用的TrustArc cookie通知（最重要）
-        "#onetrust-banner-sdk",   # 最常见的
-        ".pf-c-modal-box",        # Red Hat特有的
-        ".cookie-banner",         # 通用cookie横幅
-        "#cookie-notice",         # 另一种常见的cookie通知
-        ".truste_box_overlay",    # TrustArc弹窗
-        ".truste_popframe",       # TrustArc弹窗框架
-        "#teconsent",             # TrustArc同意元素
+        "#onetrust-banner-sdk",  # 最常见的
+        ".pf-c-modal-box",  # Red Hat特有的
+        ".cookie-banner",  # 通用cookie横幅
+        "#cookie-notice",  # 另一种常见的cookie通知
+        ".truste_box_overlay",  # TrustArc弹窗
+        ".truste_popframe",  # TrustArc弹窗框架
+        "#teconsent",  # TrustArc同意元素
     ]
 
     # 常见的接受按钮选择器，优化为只包含最常用和Red Hat特有的选择器
     accept_button_selectors = [
-        "#truste-consent-button",       # TrustArc同意按钮（Red Hat使用）
-        ".truste_popclose",             # TrustArc关闭按钮
-        "button.pf-c-button[aria-label='Close']", # Red Hat特有
-        "button.pf-c-button.pf-m-primary", # Red Hat特有
-        "#onetrust-accept-btn-handler", # 常见的
-        "button:has-text('Accept')",    # 通用接受按钮
-        "button:has-text('I agree')",   # 通用同意按钮
-        "button:has-text('Close')",     # 通用关闭按钮
+        "#truste-consent-button",  # TrustArc同意按钮（Red Hat使用）
+        ".truste_popclose",  # TrustArc关闭按钮
+        "button.pf-c-button[aria-label='Close']",  # Red Hat特有
+        "button.pf-c-button.pf-m-primary",  # Red Hat特有
+        "#onetrust-accept-btn-handler",  # 常见的
+        "button:has-text('Accept')",  # 通用接受按钮
+        "button:has-text('I agree')",  # 通用同意按钮
+        "button:has-text('Close')",  # 通用关闭按钮
     ]
 
     # 为每个cookie横幅选择器添加处理程序
@@ -68,7 +75,16 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
                             logger.debug(f"尝试点击按钮 {btn_selector} 失败: {e}")
 
                     # 如果没有找到特定按钮，尝试通过文本查找
-                    for text in ["Accept", "Accept All", "I agree", "Agree", "Close", "OK", "Continue", "Got it"]:
+                    for text in [
+                        "Accept",
+                        "Accept All",
+                        "I agree",
+                        "Agree",
+                        "Close",
+                        "OK",
+                        "Continue",
+                        "Got it",
+                    ]:
                         try:
                             button = banner.get_by_text(text, exact=False)
                             if await button.is_visible():
@@ -96,7 +112,7 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
                                 if (acceptButton) acceptButton.click();
                             }
                             """,
-                            await banner.element_handle()
+                            await banner.element_handle(),
                         )
                     except Exception as e:
                         logger.debug(f"使用JavaScript点击失败: {e}")
@@ -210,10 +226,22 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
     # 添加特定的Red Hat cookie处理
     try:
         # 在页面加载前设置最关键的cookie
-        await page.context.add_cookies([
-            {"name": "redhat_cookie_notice_accepted", "value": "true", "domain": ".redhat.com", "path": "/"},
-            {"name": "OptanonAlertBoxClosed", "value": "2023-01-01T12:00:00.000Z", "domain": ".redhat.com", "path": "/"},
-        ])
+        await page.context.add_cookies(
+            [
+                {
+                    "name": "redhat_cookie_notice_accepted",
+                    "value": "true",
+                    "domain": ".redhat.com",
+                    "path": "/",
+                },
+                {
+                    "name": "OptanonAlertBoxClosed",
+                    "value": "2023-01-01T12:00:00.000Z",
+                    "domain": ".redhat.com",
+                    "path": "/",
+                },
+            ]
+        )
         logger.info("已预设Red Hat cookie接受标志")
     except Exception as e:
         logger.debug(f"预设cookie失败: {e}")

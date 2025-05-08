@@ -2,7 +2,7 @@
 搜索模块测试
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from playwright.async_api import ElementHandle, Page
@@ -108,7 +108,9 @@ async def test_perform_search():
                 mock_build_url.assert_called_once_with(
                     "test query", ["Test Product"], ["Test Type"], 1, 20, "relevant"
                 )
-                mock_page.goto.assert_called_once_with("https://test-url.com", wait_until="domcontentloaded")
+                mock_page.goto.assert_called_once_with(
+                    "https://test-url.com", wait_until="domcontentloaded"
+                )
                 assert mock_handle_cookie.called
                 mock_extract.assert_called_once_with(mock_page)
 
@@ -306,5 +308,7 @@ async def test_get_document_content():
         assert document["metadata"]["Last Updated"] == "2023-01-01"
 
         # 验证页面导航
-        mock_page.goto.assert_called_once_with("https://example.com/document", wait_until="domcontentloaded")
+        mock_page.goto.assert_called_once_with(
+            "https://example.com/document", wait_until="domcontentloaded"
+        )
         assert mock_handle_cookie.called

@@ -3,11 +3,7 @@
 """
 
 import os
-import sys
-import subprocess
-from unittest.mock import patch, MagicMock
 
-import pytest
 
 
 def test_mcp_server_exists():

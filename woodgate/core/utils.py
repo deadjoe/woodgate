@@ -161,7 +161,24 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                             continue
 
                     # 尝试通过文本内容查找按钮
-                    for button_text in ["Accept", "I agree", "Close", "OK", "Accept All", "Accept Cookies", "Agree", "Continue", "Got it", "I understand", "接受", "同意", "关闭", "继续", "我同意", "我理解"]:
+                    for button_text in [
+                        "Accept",
+                        "I agree",
+                        "Close",
+                        "OK",
+                        "Accept All",
+                        "Accept Cookies",
+                        "Agree",
+                        "Continue",
+                        "Got it",
+                        "I understand",
+                        "接受",
+                        "同意",
+                        "关闭",
+                        "继续",
+                        "我同意",
+                        "我理解",
+                    ]:
                         try:
                             # 使用text=按钮文本定位
                             button = await page.get_by_text(button_text, exact=False).first()

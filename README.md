@@ -19,6 +19,7 @@
 - 模块化设计，便于维护和扩展
 - 完善的单元测试（覆盖率79%）
 - 支持uv包管理工具（已测试兼容uv 0.7.2+）
+- 便捷的启动脚本，一键启动服务器
 
 ## 系统要求
 
@@ -76,9 +77,25 @@
 
 ## 使用方法
 
+### 使用启动脚本运行
+
+最简单的方法是使用提供的启动脚本：
+
+```bash
+./start_server.sh
+```
+
+这将自动：
+
+- 激活虚拟环境
+- 设置必要的环境变量
+- 创建日志和截图目录
+- 启动服务器（主机：0.0.0.0，端口：8080，日志级别：DEBUG）
+- 将日志输出重定向到日志文件
+
 ### 作为MCP服务器运行
 
-运行MCP服务器:
+手动运行MCP服务器:
 
 ```bash
 uv run python -m woodgate
@@ -173,6 +190,7 @@ document_types = mcp.resources["config://doc-types"]
 - 如需使用不同凭据，可通过环境变量覆盖：`REDHAT_USERNAME` 和 `REDHAT_PASSWORD`
 - 在生产环境中，建议使用环境变量或配置文件管理凭据
 - 确保凭据信息不被提交到公共代码仓库
+- 凭据存储在服务器端，不需要在Claude Desktop端配置
 
 ## 开发
 
@@ -249,6 +267,7 @@ tests/                   # 测试目录
 # 根目录关键文件
 server.py                # 独立MCP服务器实现，包含所有必要功能
 mcp_server.py            # MCP服务器启动脚本，处理依赖和环境
+start_server.sh          # 便捷的服务器启动脚本，自动设置环境和启动服务器
 ```
 
 ### 关键文件说明
@@ -261,6 +280,7 @@ mcp_server.py            # MCP服务器启动脚本，处理依赖和环境
 - 内置所有功能（浏览器管理、认证、搜索等）
 - 详细的调试日志
 - 全面的错误处理
+- 禁用截图功能（在Claude Desktop环境中）
 
 #### mcp_server.py
 
@@ -282,6 +302,26 @@ python mcp_server.py
 export REDHAT_USERNAME="your_username"
 export REDHAT_PASSWORD="your_password"
 python mcp_server.py
+```
+
+#### start_server.sh
+
+便捷的服务器启动脚本，提供一键启动功能：
+
+- 自动设置环境变量（包括凭据和日志级别）
+- 自动激活Python虚拟环境
+- 创建必要的日志和截图目录
+- 使用正确的参数启动服务器
+- 将日志输出重定向到文件
+
+使用方法：
+
+```bash
+# 确保脚本有执行权限
+chmod +x start_server.sh
+
+# 运行脚本
+./start_server.sh
 ```
 
 ## 许可证

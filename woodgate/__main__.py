@@ -6,10 +6,11 @@ import argparse
 import logging
 import sys
 
+from .config import get_config
+from .core.utils import setup_logging
+
 # FastMCP类有run方法，不需要单独导入run_server
 from .server import mcp
-from .core.utils import setup_logging
-from .config import get_config
 
 
 def parse_args():
@@ -53,6 +54,11 @@ def main():
 
     # 运行服务器
     try:
+        # 更新FastMCP的settings属性
+        mcp.settings.host = host
+        mcp.settings.port = port
+        mcp.settings.log_level = log_level
+
         # 使用FastMCP的run方法启动服务器
         print(f"启动Woodgate MCP服务器 (transport=sse, host={host}, port={port})...")
         mcp.run(transport="sse")

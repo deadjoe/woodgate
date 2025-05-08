@@ -5,9 +5,9 @@
 
 import logging
 import time
-import json
-from typing import Dict, Any, List, Optional
-from playwright.async_api import Page, BrowserContext
+from typing import Any, Dict
+
+from playwright.async_api import BrowserContext, Page
 
 logger = logging.getLogger(__name__)
 
@@ -104,13 +104,25 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
             "[role='dialog'][aria-modal='true']",  # 通用备选
             ".cookie-banner",  # 通用cookie横幅
             "#cookie-notice",  # 另一种常见的cookie通知
+            "#truste-consent-track",  # Red Hat使用的TrustArc cookie通知
+            ".truste_box_overlay",  # TrustArc弹窗
+            ".truste_overlay",  # TrustArc弹窗
+            "#consent_blackbar",  # 另一种常见的cookie通知
+            ".evidon-banner",  # Evidon cookie通知
+            ".cookie-consent-banner",  # 通用cookie横幅
+            "#gdpr-cookie-message",  # GDPR cookie消息
+            "#cookiebanner",  # 通用cookie横幅
+            "#cookie-law-info-bar",  # Cookie Law Info插件
+            ".cc-window",  # Cookie Consent插件
         ]
 
         # 检查是否存在cookie通知
         for selector in popup_selectors:
             try:
                 # 使用waitForSelector而不是等待元素可见，提高效率
-                cookie_notice = await page.wait_for_selector(selector, timeout=timeout * 1000, state="attached")
+                cookie_notice = await page.wait_for_selector(
+                    selector, timeout=timeout * 1000, state="attached"
+                )
                 if cookie_notice:
                     log_step(f"发现cookie通知，使用选择器: {selector}")
 
@@ -121,6 +133,16 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                         "button.pf-c-button.pf-m-primary",
                         ".close-button",
                         "button[aria-label='Close']",
+                        "#truste-consent-button",  # TrustArc同意按钮
+                        ".truste_popclose",  # TrustArc关闭按钮
+                        ".trustarc-agree-btn",  # TrustArc同意按钮
+                        ".evidon-banner-acceptbutton",  # Evidon接受按钮
+                        ".cc-dismiss",  # Cookie Consent关闭按钮
+                        ".cc-accept-all",  # Cookie Consent接受所有按钮
+                        "#cookie-notice-accept-button",  # Cookie Notice接受按钮
+                        ".cookie-consent-button",  # 通用cookie同意按钮
+                        "button:has-text('Accept All')",  # 接受所有按钮
+                        "button:has-text('Accept Cookies')",  # 接受cookies按钮
                     ]
 
                     # 先尝试在cookie通知元素内查找关闭按钮
@@ -139,7 +161,7 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                             continue
 
                     # 尝试通过文本内容查找按钮
-                    for button_text in ["Accept", "I agree", "Close", "OK", "接受", "同意", "关闭"]:
+                    for button_text in ["Accept", "I agree", "Close", "OK", "Accept All", "Accept Cookies", "Agree", "Continue", "Got it", "I understand", "接受", "同意", "关闭", "继续", "我同意", "我理解"]:
                         try:
                             # 使用text=按钮文本定位
                             button = await page.get_by_text(button_text, exact=False).first()
@@ -154,19 +176,43 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
 
                     # 如果上述方法都失败，尝试使用JavaScript点击
                     try:
-                        await page.evaluate(f"""
-                            const buttons = Array.from(document.querySelectorAll('button'));
+                        await page.evaluate(
+                            """
+                            const buttons = Array.from(document.querySelectorAll('button, a.button, input[type="button"], input[type="submit"]'));
                             const acceptButton = buttons.find(button =>
                                 button.textContent.toLowerCase().includes('accept') ||
                                 button.textContent.toLowerCase().includes('agree') ||
                                 button.textContent.toLowerCase().includes('close') ||
                                 button.textContent.toLowerCase().includes('ok') ||
+                                button.textContent.toLowerCase().includes('got it') ||
+                                button.textContent.toLowerCase().includes('continue') ||
+                                button.textContent.toLowerCase().includes('understand') ||
                                 button.textContent.toLowerCase().includes('接受') ||
                                 button.textContent.toLowerCase().includes('同意') ||
-                                button.textContent.toLowerCase().includes('关闭')
+                                button.textContent.toLowerCase().includes('关闭') ||
+                                button.textContent.toLowerCase().includes('继续') ||
+                                button.textContent.toLowerCase().includes('理解')
                             );
                             if (acceptButton) acceptButton.click();
-                        """)
+
+                            // 尝试点击特定ID的按钮
+                            const specificButtons = [
+                                document.querySelector('#truste-consent-button'),
+                                document.querySelector('#onetrust-accept-btn-handler'),
+                                document.querySelector('.trustarc-agree-btn'),
+                                document.querySelector('.evidon-banner-acceptbutton'),
+                                document.querySelector('.cc-accept-all'),
+                                document.querySelector('#cookie-notice-accept-button')
+                            ];
+
+                            for (const btn of specificButtons) {
+                                if (btn) {
+                                    btn.click();
+                                    break;
+                                }
+                            }
+                        """
+                        )
                         log_step("已使用JavaScript尝试点击按钮")
                         # 恢复默认超时时间
                         page.set_default_timeout(30000)

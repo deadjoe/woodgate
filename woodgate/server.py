@@ -3,22 +3,28 @@ MCP服务器模块 - 实现Model Context Protocol服务器
 """
 
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from .core.browser import initialize_browser
+from .config import get_available_products, get_credentials, get_document_types
 from .core.auth import login_to_redhat_portal
-from .core.search import perform_search, get_product_alerts, get_document_content
+from .core.browser import initialize_browser
+from .core.search import get_document_content, get_product_alerts, perform_search
 from .core.utils import setup_logging
-from .config import get_credentials, get_available_products, get_document_types
 
 # 设置日志
 setup_logging()
 logger = logging.getLogger(__name__)
 
 # 创建MCP服务器
-mcp = FastMCP("Woodgate", description="Red Hat客户门户搜索工具")
+mcp = FastMCP(
+    "Woodgate",
+    description="Red Hat客户门户搜索工具",
+    host="0.0.0.0",  # 默认监听所有接口
+    port=8000,       # 默认端口
+    log_level="INFO"  # 默认日志级别
+)
 
 
 @mcp.tool()
@@ -67,6 +73,7 @@ async def search(
     except Exception as e:
         logger.error(f"搜索过程中出错: {e}")
         import traceback
+
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return [{"error": f"搜索过程中出错: {str(e)}"}]
     finally:
@@ -108,6 +115,7 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.error(f"获取警报过程中出错: {e}")
         import traceback
+
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return [{"error": f"获取警报过程中出错: {str(e)}"}]
     finally:
@@ -149,6 +157,7 @@ async def get_document(document_url: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"获取文档内容过程中出错: {e}")
         import traceback
+
         logger.error(f"错误堆栈: {traceback.format_exc()}")
         return {"error": f"获取文档内容过程中出错: {str(e)}"}
     finally:

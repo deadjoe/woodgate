@@ -2,11 +2,12 @@
 认证模块扩展测试
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from selenium.common.exceptions import TimeoutException
 
-from woodgate.core.auth import login_to_redhat_portal, check_login_status, handle_cookie_popup
+from woodgate.core.auth import check_login_status, handle_cookie_popup, login_to_redhat_portal
 
 
 @pytest.mark.asyncio

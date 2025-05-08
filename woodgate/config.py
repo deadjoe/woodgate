@@ -2,9 +2,9 @@
 配置模块 - 管理应用程序配置和环境变量
 """
 
-import os
 import logging
-from typing import Dict, Any, Tuple
+import os
+from typing import Any, Dict, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ def get_credentials() -> Tuple[str, str]:
     """
     获取Red Hat客户门户的登录凭据
 
-    从环境变量中获取用户名和密码，如果未设置则使用默认值（仅用于开发测试）
+    优先使用环境变量，否则使用固定凭据
 
     Returns:
         Tuple[str, str]: 用户名和密码
@@ -22,16 +22,16 @@ def get_credentials() -> Tuple[str, str]:
     username = os.environ.get("REDHAT_USERNAME")
     password = os.environ.get("REDHAT_PASSWORD")
 
-    # 如果环境变量未设置，使用默认值（仅用于开发测试）
+    # 如果环境变量未设置，使用固定凭据
     if not username or not password:
-        username = os.environ.get("REDHAT_USERNAME_DEFAULT", "")
-        password = os.environ.get("REDHAT_PASSWORD_DEFAULT", "")
+        # 固定凭据，用于生产环境
+        username = "smartjoe@gmail.com"
+        password = "***REMOVED***"
+        logger.info("使用固定凭据")
+    else:
+        logger.info("使用环境变量中的凭据")
 
-        if not username or not password:
-            logger.warning(
-                "未设置Red Hat凭据环境变量，请设置REDHAT_USERNAME和REDHAT_PASSWORD环境变量"
-            )
-
+    logger.debug(f"凭据获取成功: username='{username}'")
     return username, password
 
 

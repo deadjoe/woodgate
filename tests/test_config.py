@@ -5,7 +5,7 @@
 import os
 from unittest.mock import patch
 
-from woodgate.config import get_credentials, get_config, get_available_products, get_document_types
+from woodgate.config import get_available_products, get_config, get_credentials, get_document_types
 
 
 def test_get_credentials_from_env():

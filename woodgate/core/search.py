@@ -5,18 +5,18 @@
 
 import asyncio
 import logging
-import urllib.parse
 import traceback
-from typing import List, Dict, Any, Optional
-from playwright.async_api import Page, BrowserContext, TimeoutError, Error
+from typing import Any, Dict, List
 
-from .utils import log_step, handle_cookie_popup
+from playwright.async_api import Error, Page, TimeoutError
+
+from .utils import handle_cookie_popup, log_step
 
 logger = logging.getLogger(__name__)
 
 # Red Hat客户门户搜索URL
 SEARCH_BASE_URL = "https://access.redhat.com/search/"
-ALERTS_BASE_URL = "https://access.redhat.com/security/security-updates/"
+ALERTS_BASE_URL = "https://access.redhat.com/security/security-updates/"  # 已弃用，保留用于兼容性
 
 
 async def perform_search(
@@ -59,7 +59,9 @@ async def perform_search(
 
         # 等待搜索结果加载
         try:
-            await page.wait_for_selector(".search-result, .pf-c-card", state="visible", timeout=15000)
+            await page.wait_for_selector(
+                ".search-result, .pf-c-card", state="visible", timeout=15000
+            )
             log_step("搜索结果已加载")
         except TimeoutError:
             log_step("等待搜索结果超时，可能没有结果或页面结构已更改")
@@ -93,7 +95,7 @@ def build_search_url(
     sort_by: str = "relevant",
 ) -> str:
     """
-    构建Red Hat客户门户搜索URL
+    构建Red Hat客户门户搜索URL，与老代码保持一致
 
     Args:
         query (str): 搜索关键词
@@ -106,32 +108,34 @@ def build_search_url(
     Returns:
         str: 构建好的搜索URL
     """
-    # 编码查询参数
-    encoded_query = urllib.parse.quote(query)
-
     # 构建基本URL
-    url = f"{SEARCH_BASE_URL}?q={encoded_query}"
+    base_url = f"{SEARCH_BASE_URL}?"
 
-    # 添加产品过滤器
+    # 构建参数字典
+    params = {
+        "q": query.replace(" ", "+"),
+        "p": page,
+        "rows": rows,
+    }
+
+    # 添加产品过滤器 - 使用%26连接多个产品，与老代码一致
     if products and len(products) > 0:
-        for product in products:
-            encoded_product = urllib.parse.quote(product)
-            url += f"&p={encoded_product}"
+        product_param = "%26".join(p.replace(" ", "+") for p in products)
+        params["product"] = product_param
 
-    # 添加文档类型过滤器
+    # 添加文档类型过滤器 - 使用%26连接多个文档类型，与老代码一致
     if doc_types and len(doc_types) > 0:
-        for doc_type in doc_types:
-            encoded_doc_type = urllib.parse.quote(doc_type)
-            url += f"&documentKind={encoded_doc_type}"
-
-    # 添加分页参数
-    url += f"&page={page}"
-    url += f"&rows={rows}"
+        doc_type_param = "%26".join(d.replace(" ", "+") for d in doc_types)
+        params["documentKind"] = doc_type_param
 
     # 添加排序参数
     if sort_by:
-        url += f"&sort={urllib.parse.quote(sort_by)}"
+        params["sort"] = sort_by.replace(" ", "+")
 
+    # 构建完整URL
+    url = base_url + "&".join(f"{k}={v}" for k, v in params.items())
+
+    logger.debug(f"构建的搜索URL: {url}")
     return url
 
 
@@ -186,14 +190,18 @@ async def extract_search_results(page: Page) -> List[Dict[str, Any]]:
 
                     # 提取摘要
                     summary = "无摘要"
-                    summary_element = await result.query_selector(".search-result-content, .pf-c-card__body")
+                    summary_element = await result.query_selector(
+                        ".search-result-content, .pf-c-card__body"
+                    )
                     if summary_element:
                         summary_text = await summary_element.text_content()
                         summary = summary_text.strip() if summary_text else "无摘要"
 
                     # 提取文档类型
                     doc_type = "未知类型"
-                    doc_type_element = await result.query_selector(".search-result-info span, .pf-c-label")
+                    doc_type_element = await result.query_selector(
+                        ".search-result-info span, .pf-c-label"
+                    )
                     if doc_type_element:
                         doc_type_text = await doc_type_element.text_content()
                         doc_type = doc_type_text.strip() if doc_type_text else "未知类型"
@@ -242,96 +250,19 @@ async def extract_search_results(page: Page) -> List[Dict[str, Any]]:
 
 async def get_product_alerts(page: Page, product: str) -> List[Dict[str, Any]]:
     """
-    获取特定产品的警报信息
+    获取特定产品的警报信息（已弃用）
+
+    此功能已弃用，因为未来使用都是通过Claude Desktop的chat来完成
 
     Args:
         page (Page): Playwright页面实例
         product (str): 产品名称
 
     Returns:
-        List[Dict[str, Any]]: 警报信息列表
+        List[Dict[str, Any]]: 空列表
     """
-    log_step(f"获取产品警报: '{product}'")
-
-    # 构建产品警报URL
-    encoded_product = urllib.parse.quote(product)
-    alerts_url = f"{ALERTS_BASE_URL}#/?q={encoded_product}&p=1&sort=portal_publication_date%20desc&rows=10&portal_advisory_type=Security%20Advisory"
-
-    try:
-        # 访问警报页面
-        await page.goto(alerts_url, wait_until="domcontentloaded")
-        log_step("已加载警报页面")
-
-        # 处理可能出现的Cookie弹窗
-        await handle_cookie_popup(page)
-
-        # 等待警报结果加载
-        try:
-            await page.wait_for_selector(".pf-c-card, .portal-advisory", state="visible", timeout=15000)
-            log_step("警报结果已加载")
-        except TimeoutError:
-            log_step("等待警报结果超时，可能没有结果或页面结构已更改")
-            return []
-
-        # 提取警报结果
-        alerts = []
-        alert_elements = await page.query_selector_all(".pf-c-card, .portal-advisory")
-        log_step(f"找到 {len(alert_elements)} 个警报元素")
-
-        for alert in alert_elements:
-            try:
-                # 提取警报标题和链接
-                title_element = await alert.query_selector("h2 a, .pf-c-title a")
-                if not title_element:
-                    continue
-
-                title = await title_element.text_content()
-                title = title.strip() if title else "未知标题"
-                url = await title_element.get_attribute("href")
-
-                # 提取警报严重性
-                severity = "未知严重性"
-                severity_element = await alert.query_selector(".security-severity, .pf-c-label")
-                if severity_element:
-                    severity_text = await severity_element.text_content()
-                    severity = severity_text.strip() if severity_text else "未知严重性"
-
-                # 提取发布日期
-                published_date = "未知日期"
-                date_element = await alert.query_selector(".portal-advisory-date, time")
-                if date_element:
-                    date_text = await date_element.text_content()
-                    published_date = date_text.strip() if date_text else "未知日期"
-
-                # 提取摘要
-                summary = "无摘要"
-                summary_element = await alert.query_selector(".portal-advisory-synopsis, .pf-c-card__body")
-                if summary_element:
-                    summary_text = await summary_element.text_content()
-                    summary = summary_text.strip() if summary_text else "无摘要"
-
-                # 添加到警报列表
-                alerts.append(
-                    {
-                        "title": title,
-                        "url": url,
-                        "severity": severity,
-                        "published_date": published_date,
-                        "summary": summary,
-                    }
-                )
-
-            except Error as e:
-                logger.warning(f"处理警报结果时出错: {e}")
-                continue
-
-        log_step(f"成功提取 {len(alerts)} 个警报")
-        return alerts
-
-    except Exception as e:
-        logger.error(f"获取产品警报时出错: {e}")
-        logger.debug(f"错误堆栈: {traceback.format_exc()}")
-        return []
+    logger.warning("get_product_alerts 函数已弃用，因为未来使用都是通过Claude Desktop的chat来完成")
+    return []
 
 
 async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
@@ -357,7 +288,9 @@ async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
 
         # 等待文档内容加载
         try:
-            await page.wait_for_selector(".field-item, .pf-c-content, article", state="visible", timeout=15000)
+            await page.wait_for_selector(
+                ".field-item, .pf-c-content, article", state="visible", timeout=15000
+            )
             log_step("文档内容已加载")
         except TimeoutError:
             log_step("等待文档内容超时，可能页面结构已更改")
@@ -385,8 +318,12 @@ async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
 
             for field in metadata_fields:
                 try:
-                    label_element = await field.query_selector(".field-label, .pf-c-description-list__term")
-                    value_element = await field.query_selector(".field-item, .pf-c-description-list__description")
+                    label_element = await field.query_selector(
+                        ".field-label, .pf-c-description-list__term"
+                    )
+                    value_element = await field.query_selector(
+                        ".field-item, .pf-c-description-list__description"
+                    )
 
                     if label_element and value_element:
                         label_text = await label_element.text_content()

@@ -21,14 +21,21 @@ logging.basicConfig(
 logger = logging.getLogger("woodgate-mcp")
 
 # 检查并安装必要的依赖
-required_packages = ["selenium", "webdriver-manager", "httpx"]
+required_packages = ["playwright", "httpx"]
 
 for package in required_packages:
     if importlib.util.find_spec(package) is None:
         logger.info(f"正在安装 {package}...")
         try:
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+            # 使用uv而不是pip安装依赖
+            subprocess.check_call(["uv", "pip", "install", package])
             logger.info(f"{package} 安装成功")
+
+            # 如果是playwright，还需要安装浏览器
+            if package == "playwright":
+                logger.info("正在安装Playwright浏览器...")
+                subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+                logger.info("Playwright浏览器安装成功")
         except Exception as e:
             logger.error(f"安装 {package} 失败: {e}")
             sys.exit(1)

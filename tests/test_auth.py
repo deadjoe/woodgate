@@ -2,10 +2,10 @@
 认证模块测试
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from playwright.async_api import Error, TimeoutError
+from playwright.async_api import TimeoutError
 
 from woodgate.core.auth import check_login_status, login_to_redhat_portal
 
@@ -37,7 +37,9 @@ async def test_login_to_redhat_portal_success():
 
             # 验证结果
             assert result is True
-            mock_page.goto.assert_called_once_with("https://access.redhat.com/login", wait_until="domcontentloaded")
+            mock_page.goto.assert_called_once_with(
+                "https://access.redhat.com/login", wait_until="domcontentloaded"
+            )
             mock_username_field.fill.assert_any_call("test_user")
             mock_password_field.fill.assert_any_call("test_pass")
             mock_login_button.click.assert_called_once()
@@ -76,7 +78,9 @@ async def test_login_to_redhat_portal_failure():
 
             # 验证结果
             assert result is False
-            mock_page.goto.assert_called_once_with("https://access.redhat.com/login", wait_until="domcontentloaded")
+            mock_page.goto.assert_called_once_with(
+                "https://access.redhat.com/login", wait_until="domcontentloaded"
+            )
             mock_username_field.fill.assert_any_call("test_user")
             mock_password_field.fill.assert_any_call("test_pass")
             mock_login_button.click.assert_called_once()
@@ -98,7 +102,9 @@ async def test_check_login_status_logged_in():
 
     # 验证结果
     assert result is True
-    mock_page.goto.assert_called_once_with("https://access.redhat.com/management", wait_until="domcontentloaded")
+    mock_page.goto.assert_called_once_with(
+        "https://access.redhat.com/management", wait_until="domcontentloaded"
+    )
 
 
 @pytest.mark.asyncio
@@ -117,4 +123,6 @@ async def test_check_login_status_not_logged_in():
 
     # 验证结果
     assert result is False
-    mock_page.goto.assert_called_once_with("https://access.redhat.com/management", wait_until="domcontentloaded")
+    mock_page.goto.assert_called_once_with(
+        "https://access.redhat.com/management", wait_until="domcontentloaded"
+    )

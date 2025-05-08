@@ -22,8 +22,8 @@ mcp = FastMCP(
     "Woodgate",
     description="Red Hat客户门户搜索工具",
     host="0.0.0.0",  # 默认监听所有接口
-    port=8000,       # 默认端口
-    log_level="INFO"  # 默认日志级别
+    port=8000,  # 默认端口
+    log_level="INFO",  # 默认日志级别
 )
 
 

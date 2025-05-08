@@ -3,10 +3,10 @@
 """
 
 import logging
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from playwright.async_api import Error, TimeoutError
+from playwright.async_api import TimeoutError
 
 from woodgate.core.utils import handle_cookie_popup, print_cookies, setup_logging
 
@@ -131,7 +131,7 @@ def test_format_alert():
             "areaDesc": "Test Area",
             "severity": "High",
             "description": "Test Description",
-            "instruction": "Test Instructions"
+            "instruction": "Test Instructions",
         }
     }
 
@@ -144,12 +144,7 @@ def test_format_alert():
     assert "Instructions: Test Instructions" in formatted
 
     # 测试缺少某些字段的警报数据
-    incomplete_alert = {
-        "properties": {
-            "event": "Test Event",
-            "severity": "High"
-        }
-    }
+    incomplete_alert = {"properties": {"event": "Test Event", "severity": "High"}}
 
     formatted = format_alert(incomplete_alert)
 

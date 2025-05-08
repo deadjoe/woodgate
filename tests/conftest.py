@@ -2,11 +2,15 @@
 Pytest配置文件
 """
 
+import asyncio
 import os
 from typing import Any, Dict, Generator
 
 import pytest
 from playwright.sync_api import BrowserContext, Page
+
+# 导入异步API
+from playwright.async_api import async_playwright
 
 
 # 自定义命令行选项
@@ -52,7 +56,7 @@ def browser_context_args() -> Dict[str, Any]:
 # 自定义页面固件
 @pytest.fixture(scope="function")
 def page(context: BrowserContext) -> Generator[Page, None, None]:
-    """创建页面并配置"""
+    """创建页面并配置 - 同步版本"""
     page = context.new_page()
 
     # 配置页面选项
@@ -64,6 +68,23 @@ def page(context: BrowserContext) -> Generator[Page, None, None]:
 
     # 测试结束后关闭页面
     page.close()
+
+
+# 自定义事件循环固件
+@pytest.fixture(scope="function")
+def event_loop():
+    """创建事件循环 - 每个测试函数一个新的事件循环"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    # 确保所有待处理的任务都已完成
+    pending = asyncio.all_tasks(loop)
+    for task in pending:
+        task.cancel()
+    # 运行直到所有任务完成
+    if pending:
+        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+    loop.close()
 
 
 # 自定义登录固件

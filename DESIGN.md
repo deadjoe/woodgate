@@ -16,7 +16,7 @@ Woodgate 是一个基于 Model Context Protocol (MCP) 的服务器，用于自�
 ### 1.2 技术栈
 
 - **Python 3.10+**: 主要编程语言
-- **Selenium**: 用于浏览器自动化和网页交互
+- **Playwright**: 用于浏览器自动化和网页交互
 - **Chrome/Chromium**: 浏览器引擎
 - **MCP SDK**: 用于实现 Model Context Protocol 服务器
 - **asyncio**: 用于异步编程
@@ -103,24 +103,53 @@ config = {
 
 ### 3.2 浏览器管理模块 (`core/browser.py`)
 
-浏览器管理模块负责初始化和管理 Chrome 浏览器实例，提供以下功能：
+浏览器管理模块负责初始化和管理 Playwright 浏览器实例，提供以下功能：
 
-- **初始化浏览器**: 配置并启动 Chrome 浏览器，设置无头模式、窗口大小等选项
+- **初始化浏览器**: 配置并启动 Chromium 浏览器，设置无头模式、窗口大小等选项
 - **优化浏览器性能**: 禁用扩展、GPU 加速、图片加载等，提高性能
-- **设置超时时间**: 配置页面加载和脚本执行的超时时间
+- **设置超时时间**: 配置页面加载和导航的超时时间
+- **处理Cookie弹窗**: 自动处理网页上出现的cookie或隐私弹窗
 
 浏览器配置示例：
 
 ```python
-chrome_options = Options()
-chrome_options.add_argument("--headless")  # 启用无头模式
-chrome_options.add_argument("--no-sandbox")  # 禁用沙箱
-chrome_options.add_argument("--disable-dev-shm-usage")  # 解决低内存环境中的崩溃问题
-chrome_options.add_argument("--window-size=1920,1080")  # 设置窗口大小
-chrome_options.add_argument("--disable-extensions")  # 禁用扩展
-chrome_options.add_argument("--disable-gpu")  # 禁用GPU加速
-chrome_options.add_argument("--blink-settings=imagesEnabled=false")  # 禁用图片加载
-chrome_options.page_load_strategy = "eager"  # 使用eager加载策略
+async def initialize_browser(headless=True):
+    """
+    初始化Playwright浏览器
+
+    Args:
+        headless (bool): 是否使用无头模式
+
+    Returns:
+        tuple: (playwright, browser, context, page)
+    """
+    playwright = await async_playwright().start()
+    browser = await playwright.chromium.launch(
+        headless=headless,
+        args=[
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-extensions",
+            "--disable-gpu",
+            "--window-size=1920,1080"
+        ]
+    )
+
+    context = await browser.new_context(
+        viewport={"width": 1920, "height": 1080},
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    )
+
+    page = await context.new_page()
+
+    # 配置页面选项
+    page.set_default_timeout(20000)  # 设置默认超时时间为20秒
+    page.set_default_navigation_timeout(30000)  # 设置导航超时时间为30秒
+
+    # 阻止加载图片，提高性能
+    await page.route("**/*.{png,jpg,jpeg,gif,svg}", lambda route: route.abort())
+
+    return playwright, browser, context, page
 ```
 
 ### 3.3 认证模块 (`core/auth.py`)
@@ -149,9 +178,15 @@ chrome_options.page_load_strategy = "eager"  # 使用eager加载策略
 
 - **执行搜索**: 根据关键词、产品和文档类型执行搜索
 - **构建搜索 URL**: 根据搜索参数构建 URL
-- **提取搜索结果**: 从搜索结果页面提取结果
+- **提取搜索结果**: 从搜索结果页面提取结果，使用多种选择器策略
 - **获取产品警报**: 获取特定产品的警报信息
 - **获取文档内容**: 获取特定文档的详细内容
+
+搜索结果提取使用多种策略：
+
+1. 首先尝试使用主要选择器（`.search-result`、`.pf-c-card`等）查找结果容器
+2. 如果未找到结果容器，尝试使用替代选择器查找结果链接
+3. 如果仍未找到结果，分析页面内容，检查是否有"无结果"消息
 
 搜索结果包含以下信息：
 
@@ -351,12 +386,13 @@ def search_example() -> str:
 - **内置所有功能**: 包含浏览器管理、认证、搜索等所有功能
 - **详细日志**: 提供详细的调试日志
 - **错误处理**: 实现全面的错误处理和异常捕获
+- **禁用截图功能**: 在Claude Desktop环境中禁用截图功能，避免错误
 
 #### 4.5.2 `mcp_server.py`
 
 `mcp_server.py` 是一个重要的辅助脚本，用于启动 MCP 服务器，它在项目中扮演着关键的桥接角色，特别是在不同环境下确保服务器能够正确启动。该文件具有以下特点：
 
-- **依赖检查与安装**: 自动检查并安装必要的依赖包（selenium, webdriver-manager, httpx），确保运行环境完整
+- **依赖检查与安装**: 自动检查并安装必要的依赖包（playwright, httpx），确保运行环境完整
 - **智能模块导入**: 实现了两种导入策略：
   1. 首先尝试从标准包结构导入 `woodgate.server` 模块（适用于已安装的包）
   2. 如果失败，则尝试直接导入 `server.py`（适用于直接运行脚本的情况）
@@ -364,25 +400,29 @@ def search_example() -> str:
 - **错误处理**: 实现全面的错误处理，包括依赖安装错误、模块导入错误和服务器启动错误
 - **日志记录**: 提供详细的日志记录，便于诊断问题
 
-这个文件的主要用途是：
+#### 4.5.3 `start_server.sh`
 
-1. 作为独立入口点运行 MCP 服务器
-2. 在不同环境（已安装包环境和直接脚本运行环境）中提供一致的启动体验
-3. 自动处理依赖和环境问题，降低用户使用门槛
+`start_server.sh` 是一个便捷的启动脚本，用于快速启动 MCP 服务器。它具有以下特点：
+
+- **环境变量设置**: 自动设置必要的环境变量，包括凭据和日志级别
+- **虚拟环境激活**: 自动激活 Python 虚拟环境
+- **日志目录创建**: 自动创建日志和截图目录
+- **服务器启动**: 使用正确的参数启动服务器
+- **日志重定向**: 将服务器日志重定向到文件，便于后续分析
 
 使用示例：
 
 ```bash
-# 直接运行
-python mcp_server.py
+# 直接运行启动脚本
+./start_server.sh
 
-# 或者设置环境变量后运行
+# 或者手动运行服务器
 export REDHAT_USERNAME="your_username"
 export REDHAT_PASSWORD="your_password"
 python mcp_server.py
 ```
 
-`mcp_server.py` 与 `server.py` 的关系是互补的：`server.py` 提供核心 MCP 服务器实现，而 `mcp_server.py` 提供便捷的启动和环境管理功能。
+这三个文件的关系是互补的：`server.py` 提供核心 MCP 服务器实现，`mcp_server.py` 提供便捷的启动和环境管理功能，而 `start_server.sh` 提供一键启动功能。
 
 ## 5. 日志系统
 
@@ -552,7 +592,9 @@ Woodgate 实现了以下浏览器优化：
 - **无头模式**: 使用无头模式运行浏览器，减少资源占用
 - **禁用图片**: 禁用图片加载，加快页面处理速度
 - **禁用扩展**: 禁用浏览器扩展，减少资源占用
-- **页面加载策略**: 使用 eager 加载策略，DOM 就绪后立即返回
+- **路由拦截**: 使用Playwright的路由功能拦截图片和其他不必要的资源
+- **超时设置**: 为不同操作设置合理的超时时间，避免长时间等待
+- **智能选择器**: 使用多种选择器策略，提高元素查找的成功率
 
 ### 9.2 并发优化
 
@@ -604,6 +646,7 @@ Woodgate 需要以下环境：
 
 - **Python 3.10+**: 主要编程语言
 - **Chrome/Chromium**: 浏览器引擎
+- **Playwright**: 浏览器自动化库
 - **必要的 Python 包**: 见 `pyproject.toml`
 - **MCP SDK 1.6+**: 用于实现 MCP 服务器
 
@@ -633,7 +676,15 @@ Woodgate 需要以下环境：
 
 ### 11.3 运行方式
 
-#### 11.3.1 作为 MCP 服务器运行
+#### 11.3.1 使用启动脚本运行
+
+```bash
+./start_server.sh
+```
+
+这将自动设置环境变量、激活虚拟环境、创建日志目录，并启动服务器。
+
+#### 11.3.2 作为 MCP 服务器运行
 
 ```bash
 uv run python -m woodgate
@@ -645,10 +696,16 @@ uv run python -m woodgate
 uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 ```
 
-#### 11.3.2 与 Claude Desktop 集成
+#### 11.3.3 与 Claude Desktop 集成
 
 ```bash
 .venv/bin/mcp install server.py:mcp --name "Red Hat KB Search"
+```
+
+然后在Claude Desktop中使用搜索工具：
+
+```python
+search(query="kubernetes troubleshooting", products=["Red Hat OpenShift Container Platform"], doc_types=["Solution"])
 ```
 
 ## 12. 调试和故障排除
@@ -723,10 +780,11 @@ print_cookies(driver, "登录后")
 
 ### 13.2 技术改进
 
-- **使用 Playwright**: 替换 Selenium，提高浏览器自动化的稳定性和性能
+- **改进搜索结果提取**: 进一步优化搜索结果提取逻辑，提高准确性
 - **实现缓存机制**: 缓存搜索结果，减少重复请求
 - **实现并发搜索**: 支持并发执行多个搜索请求
 - **实现分布式部署**: 支持分布式部署，提高可扩展性
+- **优化文档获取功能**: 改进文档内容提取逻辑，提高准确性
 
 ### 13.3 用户体验改进
 

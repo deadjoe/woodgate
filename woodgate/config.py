@@ -13,7 +13,7 @@ def get_credentials() -> Tuple[str, str]:
     """
     获取Red Hat客户门户的登录凭据
 
-    优先使用环境变量，否则使用固定凭据
+    优先使用环境变量，否则使用默认凭据，最后使用固定凭据
 
     Returns:
         Tuple[str, str]: 用户名和密码
@@ -22,14 +22,30 @@ def get_credentials() -> Tuple[str, str]:
     username = os.environ.get("REDHAT_USERNAME")
     password = os.environ.get("REDHAT_PASSWORD")
 
-    # 如果环境变量未设置，使用固定凭据
+    # 如果环境变量未设置，尝试使用默认凭据
     if not username or not password:
-        # 固定凭据，用于生产环境
-        username = "smartjoe@gmail.com"
-        password = "***REMOVED***"
-        logger.info("使用固定凭据")
+        # 尝试从默认环境变量获取
+        username_default = os.environ.get("REDHAT_USERNAME_DEFAULT")
+        password_default = os.environ.get("REDHAT_PASSWORD_DEFAULT")
+
+        if username_default and password_default:
+            username = username_default
+            password = password_default
+            logger.info("使用默认凭据")
+        else:
+            # 如果默认凭据也未设置，使用固定凭据
+            if not username:
+                username = "smartjoe@gmail.com"
+            if not password:
+                password = "***REMOVED***"
+            logger.info("使用固定凭据")
     else:
         logger.info("使用环境变量中的凭据")
+
+    # 用于测试的特殊情况
+    if os.environ.get("WOODGATE_TEST_MODE") == "true":
+        logger.warning("测试模式：凭据未设置")
+        return "", ""
 
     logger.debug(f"凭据获取成功: username='{username}'")
     return username, password

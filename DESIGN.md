@@ -66,8 +66,9 @@ woodgate/
 
 除了标准的模块化结构外，项目还包含两个独立的服务器文件，用于直接与 Claude Desktop 集成：
 
-- `server.py`: 独立的 MCP 服务器实现，包含所有必要的功能
-- `mcp_server.py`: 辅助脚本，用于启动 MCP 服务器
+- `server.py`: 独立的 MCP 服务器实现，包含所有必要的功能，是与Claude Desktop集成的主要入口点
+- `woodgate/server.py`: 模块化的MCP服务器实现，是标准包结构的一部分
+- `mcp_server.py`: 辅助脚本，用于启动 MCP 服务器，处理依赖和环境配置
 
 ## 3. 核心模块详解
 
@@ -500,15 +501,21 @@ Woodgate 使用 pytest 进行单元测试，测试结构如下：
 
 ```text
 tests/
+├── conftest.py          # 测试配置和固件
+├── test_async_fixed.py  # 修复的异步测试
+├── test_async_with_playwright.py # 使用Playwright的异步测试
 ├── test_auth.py         # 认证测试
 ├── test_auth_extended.py# 扩展认证测试
 ├── test_browser.py      # 浏览器测试
 ├── test_config.py       # 配置测试
 ├── test_main.py         # 主模块测试
+├── test_mcp_server.py   # MCP服务器测试
+├── test_playwright_browser.py # Playwright浏览器测试
 ├── test_search.py       # 搜索测试
 ├── test_search_extended.py # 扩展搜索测试
 ├── test_server.py       # 服务器测试
-└── test_utils.py        # 工具函数测试
+├── test_utils.py        # 工具函数测试
+└── test_with_playwright_fixtures.py # 使用Playwright固件的测试
 ```
 
 ### 7.2 测试类型
@@ -522,7 +529,7 @@ Woodgate 实现了以下类型的测试：
 
 ### 7.3 测试覆盖率
 
-Woodgate 的测试覆盖率目标为 70%，当前覆盖率为 79%。测试覆盖以下方面：
+Woodgate 的测试覆盖率目标为 70%，当前覆盖率为 33%。测试覆盖以下方面：
 
 - **功能覆盖**: 测试所有公共函数和方法
 - **分支覆盖**: 测试条件分支

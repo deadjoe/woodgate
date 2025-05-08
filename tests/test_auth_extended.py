@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from selenium.common.exceptions import TimeoutException
 
-from woodgate.core.auth import check_login_status, handle_cookie_popup, login_to_redhat_portal
+from woodgate.core.auth import check_login_status, login_to_redhat_portal
+from woodgate.core.utils import handle_cookie_popup
 
 
 @pytest.mark.asyncio
@@ -16,7 +17,7 @@ async def test_login_to_redhat_portal_cookie_popup_error():
     mock_driver = MagicMock()
 
     # 模拟handle_cookie_popup函数返回False
-    with patch("woodgate.core.auth.handle_cookie_popup", return_value=False):
+    with patch("woodgate.core.utils.handle_cookie_popup", return_value=False):
         # 模拟登录过程中的异常
         mock_driver.get.side_effect = Exception("Connection error")
 
@@ -33,7 +34,7 @@ async def test_login_to_redhat_portal_username_field_not_found():
     """测试登录 - 用户名字段未找到"""
     mock_driver = MagicMock()
 
-    with patch("woodgate.core.auth.handle_cookie_popup", return_value=True):
+    with patch("woodgate.core.utils.handle_cookie_popup", return_value=True):
         with patch("woodgate.core.auth.WebDriverWait") as mock_wait:
             # 模拟等待用户名字段超时
             mock_wait.return_value.until.side_effect = TimeoutException(
@@ -57,7 +58,7 @@ async def test_login_to_redhat_portal_password_field_not_found():
     mock_driver = MagicMock()
     mock_username_field = MagicMock()
 
-    with patch("woodgate.core.auth.handle_cookie_popup", return_value=True):
+    with patch("woodgate.core.utils.handle_cookie_popup", return_value=True):
         with patch("woodgate.core.auth.WebDriverWait") as mock_wait:
             # 模拟找到用户名字段但密码字段超时
             mock_wait.return_value.until.side_effect = [
@@ -83,7 +84,7 @@ async def test_login_to_redhat_portal_login_button_not_found():
     mock_username_field = MagicMock()
     mock_password_field = MagicMock()
 
-    with patch("woodgate.core.auth.handle_cookie_popup", return_value=True):
+    with patch("woodgate.core.utils.handle_cookie_popup", return_value=True):
         with patch("woodgate.core.auth.WebDriverWait") as mock_wait:
             # 模拟找到用户名和密码字段但登录按钮超时
             mock_wait.return_value.until.side_effect = [

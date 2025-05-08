@@ -5,14 +5,12 @@ MCP服务器模块 - 实现Model Context Protocol服务器
 
 import os
 import sys
-import time
 import logging
 import asyncio
 import subprocess
 import importlib.util
 import traceback
 import urllib.parse
-import json
 from typing import List, Dict, Any, Optional, Tuple
 
 # 环境变量应该在运行时设置，而不是硬编码在代码中
@@ -48,7 +46,9 @@ for package in required_packages:
                     except Exception as e:
                         logger.warning(f"安装Playwright浏览器失败: {e}")
                         logger.warning("尝试使用Python模块安装浏览器...")
-                        subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+                        subprocess.check_call(
+                            [sys.executable, "-m", "playwright", "install", "chromium"]
+                        )
                         logger.info("Playwright浏览器安装成功")
             except Exception as e1:
                 logger.warning(f"使用uv安装 {package} 失败: {e1}")
@@ -61,7 +61,9 @@ for package in required_packages:
                     if package == "playwright":
                         logger.info("安装Playwright浏览器...")
                         try:
-                            subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
+                            subprocess.check_call(
+                                [sys.executable, "-m", "playwright", "install", "chromium"]
+                            )
                             logger.info("Playwright浏览器安装成功")
                         except Exception as e:
                             logger.warning(f"安装Playwright浏览器失败: {e}")
@@ -95,7 +97,7 @@ except ImportError as e:
 mcp = FastMCP(
     name="Woodgate",
     instructions="Red Hat客户门户搜索工具，提供登录、搜索和文档获取功能。",
-    log_level="DEBUG"  # 设置日志级别为DEBUG
+    log_level="DEBUG",  # 设置日志级别为DEBUG
 )
 
 # 添加自定义日志记录
@@ -107,6 +109,7 @@ REDHAT_LOGIN_URL = "https://sso.redhat.com/auth/realms/redhat-external/login-act
 REDHAT_SEARCH_URL = "https://access.redhat.com/search"
 REDHAT_DIRECT_LOGIN_URL = "https://access.redhat.com/login"
 ALERTS_BASE_URL = "https://access.redhat.com/security/security-updates/"
+
 
 # 可用产品列表
 def available_products():
@@ -144,6 +147,7 @@ def available_products():
         "Red Hat Identity Management",
     ]
 
+
 # 文档类型列表
 def document_types():
     """
@@ -165,6 +169,7 @@ def document_types():
         "Bug Fix",
         "Enhancement",
     ]
+
 
 # 搜索参数配置
 def search_params():
@@ -206,7 +211,9 @@ def get_credentials():
 
 
 # 初始化浏览器
-async def initialize_browser() -> Tuple[Optional[Playwright], Optional[Browser], Optional[BrowserContext], Optional[Page]]:
+async def initialize_browser() -> (
+    Tuple[Optional[Playwright], Optional[Browser], Optional[BrowserContext], Optional[Page]]
+):
     """
     初始化Playwright浏览器
 
@@ -236,7 +243,7 @@ async def initialize_browser() -> Tuple[Optional[Playwright], Optional[Browser],
                 "--disable-extensions",  # 禁用扩展，减少资源占用和干扰
                 "--disable-gpu",  # 禁用GPU加速，提高在服务器环境下的兼容性
                 "--disable-notifications",  # 禁用通知，避免弹窗干扰
-            ]
+            ],
         )
         if browser is None:
             logger.error("浏览器启动失败，返回了None")
@@ -326,7 +333,7 @@ async def close_browser(
     playwright: Optional[Playwright] = None,
     browser: Optional[Browser] = None,
     context: Optional[BrowserContext] = None,
-    page: Optional[Page] = None
+    page: Optional[Page] = None,
 ) -> None:
     """
     安全关闭浏览器及相关资源
@@ -419,7 +426,9 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
         for selector in popup_selectors:
             try:
                 # 使用waitForSelector而不是等待元素可见，提高效率
-                cookie_notice = await page.wait_for_selector(selector, timeout=timeout * 1000, state="attached")
+                cookie_notice = await page.wait_for_selector(
+                    selector, timeout=timeout * 1000, state="attached"
+                )
                 if cookie_notice:
                     logger.debug(f"发现cookie通知，使用选择器: {selector}")
                     await cookie_notice.click()
@@ -481,7 +490,10 @@ async def take_screenshot(page: Page, name: str) -> None:
     logger.debug(f"截图功能已禁用: {name}")
     pass
 
-async def login_to_redhat_portal(page: Page, context: BrowserContext, username: str, password: str) -> bool:
+
+async def login_to_redhat_portal(
+    page: Page, context: BrowserContext, username: str, password: str
+) -> bool:
     """
     登录到Red Hat客户门户
 
@@ -517,9 +529,16 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
 
             # 尝试使用备用URL
             try:
-                logger.info("尝试使用备用URL: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/auth")
-                print("尝试使用备用URL: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/auth")
-                await page.goto("https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/auth", wait_until="domcontentloaded")
+                logger.info(
+                    "尝试使用备用URL: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/auth"
+                )
+                print(
+                    "尝试使用备用URL: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/auth"
+                )
+                await page.goto(
+                    "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/auth",
+                    wait_until="domcontentloaded",
+                )
                 logger.info("已加载备用登录页面")
                 print("已加载备用登录页面")
                 await take_screenshot(page, "alternate_login_page")
@@ -574,7 +593,7 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                 "input[id='username']",
                 "input[type='text'][name='username']",
                 "input[placeholder*='username' i]",
-                "input[placeholder*='email' i]"
+                "input[placeholder*='email' i]",
             ]
 
             username_field = None
@@ -582,7 +601,9 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                 try:
                     logger.info(f"尝试选择器: {selector}")
                     print(f"尝试选择器: {selector}")
-                    username_field = await page.wait_for_selector(selector, state="visible", timeout=3000)
+                    username_field = await page.wait_for_selector(
+                        selector, state="visible", timeout=3000
+                    )
                     if username_field:
                         logger.info(f"找到用户名输入框，使用选择器: {selector}")
                         print(f"找到用户名输入框，使用选择器: {selector}")
@@ -610,7 +631,9 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                 try:
                     logger.info("尝试使用JavaScript填充用户名")
                     print("尝试使用JavaScript填充用户名")
-                    await page.evaluate(f'document.querySelector("input[type=text]").value = "{username}"')
+                    await page.evaluate(
+                        f'document.querySelector("input[type=text]").value = "{username}"'
+                    )
                     logger.info("已使用JavaScript输入用户名")
                     await take_screenshot(page, "after_js_username_input")
                 except Exception as e:
@@ -625,7 +648,9 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
         # 点击下一步按钮（如果存在）
         logger.info("检查是否存在下一步按钮...")
         try:
-            next_button = await page.wait_for_selector("#login-show-step2", state="visible", timeout=3000)
+            next_button = await page.wait_for_selector(
+                "#login-show-step2", state="visible", timeout=3000
+            )
             if next_button:
                 logger.info("找到下一步按钮")
                 await next_button.click()
@@ -639,7 +664,9 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
         # 输入密码
         logger.info("等待密码输入框...")
         try:
-            password_field = await page.wait_for_selector("#password", state="visible", timeout=10000)
+            password_field = await page.wait_for_selector(
+                "#password", state="visible", timeout=10000
+            )
             if password_field:
                 logger.info("找到密码输入框")
                 await password_field.fill("")  # 清空
@@ -668,7 +695,7 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                 "button:has-text('Log in')",
                 "button:has-text('Sign in')",
                 "button:has-text('Login')",
-                "button:has-text('Submit')"
+                "button:has-text('Submit')",
             ]
 
             login_button = None
@@ -676,7 +703,9 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                 try:
                     logger.info(f"尝试登录按钮选择器: {selector}")
                     print(f"尝试登录按钮选择器: {selector}")
-                    login_button = await page.wait_for_selector(selector, state="visible", timeout=2000)
+                    login_button = await page.wait_for_selector(
+                        selector, state="visible", timeout=2000
+                    )
                     if login_button:
                         logger.info(f"找到登录按钮，使用选择器: {selector}")
                         print(f"找到登录按钮，使用选择器: {selector}")
@@ -702,7 +731,7 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                         "document.querySelector('button[type=\"submit\"]').click()",
                         "document.querySelector('button.pf-c-button.pf-m-primary').click()",
                         "Array.from(document.querySelectorAll('button')).find(el => el.textContent.includes('Log in') || el.textContent.includes('Sign in') || el.textContent.includes('Login')).click()",
-                        "document.forms[0].submit()"
+                        "document.forms[0].submit()",
                     ]
 
                     for js_method in js_methods:
@@ -743,7 +772,7 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                 "#rh-header",
                 ".pf-c-masthead",
                 ".pf-c-toolbar",
-                ".pf-c-content"
+                ".pf-c-content",
             ]
 
             # 尝试每个选择器
@@ -757,8 +786,10 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                     cookies = await context.cookies()
                     logger.info(f"登录后的cookies数量: {len(cookies)}")
                     for cookie in cookies:
-                        if cookie.get('name') in ['JSESSIONID', 'rh_sso_session', 'rh_user']:
-                            logger.info(f"重要Cookie: {cookie.get('name')}={cookie.get('value')[:10]}...")
+                        if cookie.get("name") in ["JSESSIONID", "rh_sso_session", "rh_user"]:
+                            logger.info(
+                                f"重要Cookie: {cookie.get('name')}={cookie.get('value')[:10]}..."
+                            )
 
                     return True
                 except Exception:
@@ -767,15 +798,19 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
             # 检查URL是否表明登录成功
             current_url = page.url
             logger.info(f"当前URL: {current_url}")
-            if "login" not in current_url and ("access.redhat.com" in current_url or "customer-portal" in current_url):
+            if "login" not in current_url and (
+                "access.redhat.com" in current_url or "customer-portal" in current_url
+            ):
                 logger.info("基于URL判断登录成功")
 
                 # 获取并打印cookies
                 cookies = await context.cookies()
                 logger.info(f"登录后的cookies数量: {len(cookies)}")
                 for cookie in cookies:
-                    if cookie.get('name') in ['JSESSIONID', 'rh_sso_session', 'rh_user']:
-                        logger.info(f"重要Cookie: {cookie.get('name')}={cookie.get('value')[:10]}...")
+                    if cookie.get("name") in ["JSESSIONID", "rh_sso_session", "rh_user"]:
+                        logger.info(
+                            f"重要Cookie: {cookie.get('name')}={cookie.get('value')[:10]}..."
+                        )
 
                 return True
 
@@ -784,7 +819,13 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
 
             # 检查页面内容是否表明登录成功
             page_content = await page.content()
-            success_indicators = ["My account", "Log out", "Sign out", "Customer Portal", "Red Hat Customer Portal"]
+            success_indicators = [
+                "My account",
+                "Log out",
+                "Sign out",
+                "Customer Portal",
+                "Red Hat Customer Portal",
+            ]
             for indicator in success_indicators:
                 if indicator in page_content:
                     logger.info(f"基于页面内容判断登录成功，找到文本: {indicator}")
@@ -793,8 +834,10 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
                     cookies = await context.cookies()
                     logger.info(f"登录后的cookies数量: {len(cookies)}")
                     for cookie in cookies:
-                        if cookie.get('name') in ['JSESSIONID', 'rh_sso_session', 'rh_user']:
-                            logger.info(f"重要Cookie: {cookie.get('name')}={cookie.get('value')[:10]}...")
+                        if cookie.get("name") in ["JSESSIONID", "rh_sso_session", "rh_user"]:
+                            logger.info(
+                                f"重要Cookie: {cookie.get('name')}={cookie.get('value')[:10]}..."
+                            )
 
                     return True
 
@@ -806,7 +849,9 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
             # 检查是否有错误消息
             try:
                 error_selector = ".kc-feedback-text, .alert-error, .pf-c-alert__title"
-                error_element = await page.wait_for_selector(error_selector, state="visible", timeout=3000)
+                error_element = await page.wait_for_selector(
+                    error_selector, state="visible", timeout=3000
+                )
                 if error_element:
                     error_text = await error_element.text_content()
                     logger.error(f"登录失败: {error_text}")
@@ -831,7 +876,13 @@ async def login_to_redhat_portal(page: Page, context: BrowserContext, username: 
 
 # 执行搜索
 async def perform_search(
-    page: Page, query: str, products=None, doc_types=None, page_num: int = 1, rows: int = 20, sort_by: str = "relevant"
+    page: Page,
+    query: str,
+    products=None,
+    doc_types=None,
+    page_num: int = 1,
+    rows: int = 20,
+    sort_by: str = "relevant",
 ) -> List[Dict[str, Any]]:
     """
     在Red Hat客户门户执行搜索
@@ -851,7 +902,9 @@ async def perform_search(
     try:
         # 构建搜索URL
         encoded_query = urllib.parse.quote(query)
-        search_url = f"{REDHAT_SEARCH_URL}?q={encoded_query}&p={page_num}&rows={rows}&sort={sort_by}"
+        search_url = (
+            f"{REDHAT_SEARCH_URL}?q={encoded_query}&p={page_num}&rows={rows}&sort={sort_by}"
+        )
 
         # 添加产品过滤
         if products:
@@ -885,7 +938,7 @@ async def perform_search(
                 ".pf-c-card",
                 "main",
                 "#rh-main",
-                "article"
+                "article",
             ]
 
             page_loaded = False
@@ -931,7 +984,7 @@ async def perform_search(
                 ".pf-c-content article",
                 "div[data-testid='search-result']",
                 ".pf-c-card__body",
-                "main .pf-l-grid__item"
+                "main .pf-l-grid__item",
             ]
 
             # 尝试使用各种选择器查找结果元素
@@ -978,7 +1031,7 @@ async def perform_search(
                     "main .co-search-result a",
                     "main div[data-testid='search-result'] a",
                     "main .pf-c-card__body a",
-                    "main .pf-l-grid__item a"
+                    "main .pf-l-grid__item a",
                 ]
 
                 for selector in search_selectors:
@@ -994,24 +1047,29 @@ async def perform_search(
                                     url = await link.get_attribute("href")
                                     if title and url and "login" not in url.lower():
                                         # 过滤掉导航链接和其他非搜索结果链接
-                                        if (len(title.strip()) > 5 and
-                                            ("solution" in url.lower() or
-                                             "article" in url.lower() or
-                                             "documentation" in url.lower() or
-                                             "troubleshooting" in url.lower() or
-                                             "kubernetes" in url.lower())):
-                                            results.append({
-                                                "title": title.strip(),
-                                                "url": url,
-                                                "summary": "无摘要",
-                                                "doc_type": "未知类型",
-                                                "last_updated": "未知日期"
-                                            })
+                                        if len(title.strip()) > 5 and (
+                                            "solution" in url.lower()
+                                            or "article" in url.lower()
+                                            or "documentation" in url.lower()
+                                            or "troubleshooting" in url.lower()
+                                            or "kubernetes" in url.lower()
+                                        ):
+                                            results.append(
+                                                {
+                                                    "title": title.strip(),
+                                                    "url": url,
+                                                    "summary": "无摘要",
+                                                    "doc_type": "未知类型",
+                                                    "last_updated": "未知日期",
+                                                }
+                                            )
                                 except Exception:
                                     continue
 
                             if results:
-                                logger.debug(f"通过选择器 {selector} 提取找到 {len(results)} 个结果")
+                                logger.debug(
+                                    f"通过选择器 {selector} 提取找到 {len(results)} 个结果"
+                                )
                                 return results
                     except Exception:
                         continue
@@ -1019,7 +1077,9 @@ async def perform_search(
                 # 如果特定选择器都失败了，尝试使用更通用的方法
                 try:
                     # 尝试直接查找搜索结果容器
-                    result_containers = await page.query_selector_all(".search-result, .pf-c-card, article.co-search-result")
+                    result_containers = await page.query_selector_all(
+                        ".search-result, .pf-c-card, article.co-search-result"
+                    )
                     if result_containers and len(result_containers) > 0:
                         logger.debug(f"找到 {len(result_containers)} 个搜索结果容器")
 
@@ -1027,7 +1087,9 @@ async def perform_search(
                         for container in result_containers:
                             try:
                                 # 提取标题和URL
-                                title_element = await container.query_selector("h2 a, h3 a, .pf-c-title a, a.co-search-result__title")
+                                title_element = await container.query_selector(
+                                    "h2 a, h3 a, .pf-c-title a, a.co-search-result__title"
+                                )
                                 if not title_element:
                                     continue
 
@@ -1036,33 +1098,43 @@ async def perform_search(
 
                                 # 提取摘要
                                 summary = "无摘要"
-                                summary_element = await container.query_selector(".co-search-result__description, .search-result-content, .pf-c-card__body p")
+                                summary_element = await container.query_selector(
+                                    ".co-search-result__description, .search-result-content, .pf-c-card__body p"
+                                )
                                 if summary_element:
                                     summary_text = await summary_element.text_content()
                                     summary = summary_text.strip() if summary_text else "无摘要"
 
                                 # 提取文档类型
                                 doc_type = "未知类型"
-                                doc_type_element = await container.query_selector(".co-search-result__kind, .search-result-info span, .pf-c-label")
+                                doc_type_element = await container.query_selector(
+                                    ".co-search-result__kind, .search-result-info span, .pf-c-label"
+                                )
                                 if doc_type_element:
                                     doc_type_text = await doc_type_element.text_content()
-                                    doc_type = doc_type_text.strip() if doc_type_text else "未知类型"
+                                    doc_type = (
+                                        doc_type_text.strip() if doc_type_text else "未知类型"
+                                    )
 
                                 # 提取最后更新时间
                                 last_updated = "未知日期"
-                                date_element = await container.query_selector(".co-search-result__date, .search-result-info time, .pf-c-label[data-testid='date']")
+                                date_element = await container.query_selector(
+                                    ".co-search-result__date, .search-result-info time, .pf-c-label[data-testid='date']"
+                                )
                                 if date_element:
                                     date_text = await date_element.text_content()
                                     last_updated = date_text.strip() if date_text else "未知日期"
 
                                 if title and url and "login" not in url.lower():
-                                    results.append({
-                                        "title": title.strip(),
-                                        "url": url,
-                                        "summary": summary,
-                                        "doc_type": doc_type,
-                                        "last_updated": last_updated
-                                    })
+                                    results.append(
+                                        {
+                                            "title": title.strip(),
+                                            "url": url,
+                                            "summary": summary,
+                                            "doc_type": doc_type,
+                                            "last_updated": last_updated,
+                                        }
+                                    )
                             except Exception as e:
                                 logger.warning(f"提取搜索结果容器时出错: {e}")
                                 continue
@@ -1072,7 +1144,9 @@ async def perform_search(
                             return results
 
                     # 如果没有找到搜索结果容器，尝试提取所有链接
-                    links = await page.query_selector_all("a[href*='access.redhat.com/solutions'], a[href*='access.redhat.com/articles']")
+                    links = await page.query_selector_all(
+                        "a[href*='access.redhat.com/solutions'], a[href*='access.redhat.com/articles']"
+                    )
                     if links and len(links) > 0:
                         logger.debug(f"找到 {len(links)} 个可能的结果链接")
 
@@ -1083,21 +1157,42 @@ async def perform_search(
                                 url = await link.get_attribute("href")
                                 if title and url and "login" not in url.lower():
                                     # 过滤掉导航链接和其他非搜索结果链接
-                                    if (len(title.strip()) > 5 and
-                                        (url.lower().startswith("https://access.redhat.com/solutions/") or
-                                         url.lower().startswith("https://access.redhat.com/articles/")) and
-                                        not any(x in url.lower() for x in [
-                                            "?q=*", "search/?", "downloads", "management", "support/cases",
-                                            "products", "community", "security/updates",
-                                            "changeLanguage", "user/edit", "groups"
-                                        ])):
-                                        results.append({
-                                            "title": title.strip(),
-                                            "url": url,
-                                            "summary": "无摘要",
-                                            "doc_type": "未知类型",
-                                            "last_updated": "未知日期"
-                                        })
+                                    if (
+                                        len(title.strip()) > 5
+                                        and (
+                                            url.lower().startswith(
+                                                "https://access.redhat.com/solutions/"
+                                            )
+                                            or url.lower().startswith(
+                                                "https://access.redhat.com/articles/"
+                                            )
+                                        )
+                                        and not any(
+                                            x in url.lower()
+                                            for x in [
+                                                "?q=*",
+                                                "search/?",
+                                                "downloads",
+                                                "management",
+                                                "support/cases",
+                                                "products",
+                                                "community",
+                                                "security/updates",
+                                                "changeLanguage",
+                                                "user/edit",
+                                                "groups",
+                                            ]
+                                        )
+                                    ):
+                                        results.append(
+                                            {
+                                                "title": title.strip(),
+                                                "url": url,
+                                                "summary": "无摘要",
+                                                "doc_type": "未知类型",
+                                                "last_updated": "未知日期",
+                                            }
+                                        )
                             except Exception:
                                 continue
 
@@ -1332,8 +1427,12 @@ async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
 
             for field in metadata_fields:
                 try:
-                    label_element = await field.query_selector(".field-label, .pf-c-description-list__term")
-                    value_element = await field.query_selector(".field-item, .pf-c-description-list__description")
+                    label_element = await field.query_selector(
+                        ".field-label, .pf-c-description-list__term"
+                    )
+                    value_element = await field.query_selector(
+                        ".field-item, .pf-c-description-list__description"
+                    )
 
                     if label_element and value_element:
                         label_text = await label_element.text_content()
@@ -1422,8 +1521,12 @@ async def search(
     Returns:
         搜索结果列表
     """
-    print(f"搜索函数开始执行，参数: query='{query}', products={products}, doc_types={doc_types}, page={page}, rows={rows}, sort_by='{sort_by}'")
-    logger.info(f"搜索函数开始执行，参数: query='{query}', products={products}, doc_types={doc_types}, page={page}, rows={rows}, sort_by='{sort_by}'")
+    print(
+        f"搜索函数开始执行，参数: query='{query}', products={products}, doc_types={doc_types}, page={page}, rows={rows}, sort_by='{sort_by}'"
+    )
+    logger.info(
+        f"搜索函数开始执行，参数: query='{query}', products={products}, doc_types={doc_types}, page={page}, rows={rows}, sort_by='{sort_by}'"
+    )
 
     # 确保 products 和 doc_types 是列表
     if products is None:
@@ -1432,6 +1535,7 @@ async def search(
         # 如果是字符串，尝试解析为列表
         try:
             import json
+
             products = json.loads(products)
             if not isinstance(products, list):
                 products = [products]
@@ -1447,6 +1551,7 @@ async def search(
         # 如果是字符串，尝试解析为列表
         try:
             import json
+
             doc_types = json.loads(doc_types)
             if not isinstance(doc_types, list):
                 doc_types = [doc_types]
@@ -1631,13 +1736,13 @@ async def get_document(document_url: str) -> Dict[str, Any]:
 
 
 @mcp.resource("config://products")
-def available_products() -> List[str]:
+def get_available_products_resource() -> List[str]:
     """获取可用的产品列表"""
     return get_available_products()
 
 
 @mcp.resource("config://doc-types")
-def document_types() -> List[str]:
+def get_document_types_resource() -> List[str]:
     """获取可用的文档类型"""
     return get_document_types()
 

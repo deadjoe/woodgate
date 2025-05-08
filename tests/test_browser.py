@@ -2,7 +2,7 @@
 浏览器模块测试
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from playwright.async_api import Browser, BrowserContext, Page, Playwright
@@ -14,15 +14,11 @@ def test_initialize_browser():
     """测试浏览器初始化函数的结构和参数"""
     # 由于initialize_browser是一个异步函数，直接测试其实现很复杂
     # 这里我们只检查函数的结构和参数，确保它存在并且可以被调用
-    from inspect import signature
-    from woodgate.core.browser import initialize_browser
 
     # 检查函数签名
-    sig = signature(initialize_browser)
-
     # 验证函数返回类型是tuple
-    return_type = initialize_browser.__annotations__.get('return', '')
-    assert str(return_type).startswith('tuple[')
+    return_type = initialize_browser.__annotations__.get("return", "")
+    assert str(return_type).startswith("tuple[")
 
     # 验证函数是异步函数
     assert initialize_browser.__code__.co_flags & 0x80  # 检查是否有CO_COROUTINE标志

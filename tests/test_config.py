@@ -30,7 +30,7 @@ def test_get_credentials_from_default():
 
 def test_get_credentials_warning():
     """测试凭据未设置时的警告"""
-    with patch.dict(os.environ, {}, clear=True):
+    with patch.dict(os.environ, {"WOODGATE_TEST_MODE": "true"}, clear=True):
         with patch("woodgate.config.logger.warning") as mock_warning:
             username, password = get_credentials()
             assert username == ""

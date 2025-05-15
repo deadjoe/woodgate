@@ -10,10 +10,10 @@ from typing import Optional
 from playwright.async_api import (
     Browser,
     BrowserContext,
+    Locator,
     Page,
     Playwright,
     async_playwright,
-    Locator,
 )
 
 logger = logging.getLogger(__name__)
@@ -276,7 +276,10 @@ async def initialize_browser() -> tuple[Playwright, Browser, BrowserContext, Pag
 
         # 创建浏览器上下文，配置视口大小和其他选项
         context = await browser.new_context(
-            viewport={"width": 1920, "height": 1080},  # 设置窗口大小，模拟标准显示器分辨率
+            viewport={
+                "width": 1920,
+                "height": 1080,
+            },  # 设置窗口大小，模拟标准显示器分辨率
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",  # 设置用户代理
             ignore_https_errors=True,  # 忽略HTTPS错误，提高兼容性
             java_script_enabled=True,  # 启用JavaScript

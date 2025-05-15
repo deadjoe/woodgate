@@ -19,7 +19,11 @@ MANAGEMENT_URL = "https://access.redhat.com/management"
 
 
 async def login_to_redhat_portal(
-    page: Page, context: BrowserContext, username: str, password: str, max_retries: int = 3
+    page: Page,
+    context: BrowserContext,
+    username: str,
+    password: str,
+    max_retries: int = 3,
 ) -> bool:
     """
     登录到Red Hat客户门户

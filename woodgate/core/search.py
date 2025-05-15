@@ -340,7 +340,12 @@ async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
             logger.warning(f"提取文档元数据时出错: {e}")
             logger.debug(f"错误堆栈: {traceback.format_exc()}")
 
-        return {"title": title, "content": content, "url": document_url, "metadata": metadata}
+        return {
+            "title": title,
+            "content": content,
+            "url": document_url,
+            "metadata": metadata,
+        }
 
     except Exception as e:
         logger.error(f"获取文档内容时出错: {e}")

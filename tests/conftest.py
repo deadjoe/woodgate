@@ -10,7 +10,12 @@ import pytest
 from playwright.sync_api import BrowserContext, Page
 
 # 导入异步API
-from playwright.async_api import async_playwright
+from playwright.async_api import (
+    async_playwright,
+    Browser as AsyncBrowser,
+    BrowserContext as AsyncBrowserContext,
+    Page as AsyncPage,
+)
 
 
 # 自定义命令行选项
@@ -70,21 +75,61 @@ def page(context: BrowserContext) -> Generator[Page, None, None]:
     page.close()
 
 
-# 自定义事件循环固件
+# 使用pytest-asyncio的事件循环策略
+@pytest.fixture(scope="session")
+def event_loop_policy():
+    """设置事件循环策略"""
+    policy = asyncio.get_event_loop_policy()
+    return policy
+
+
+# 异步浏览器固件
 @pytest.fixture(scope="function")
-def event_loop():
-    """创建事件循环 - 每个测试函数一个新的事件循环"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    yield loop
-    # 确保所有待处理的任务都已完成
-    pending = asyncio.all_tasks(loop)
-    for task in pending:
-        task.cancel()
-    # 运行直到所有任务完成
-    if pending:
-        loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-    loop.close()
+async def async_browser():
+    """创建异步浏览器实例"""
+    async with async_playwright() as playwright:
+        browser = await playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-extensions",
+                "--disable-gpu",
+                "--disable-notifications",
+            ],
+        )
+        yield browser
+        await browser.close()
+
+
+# 异步浏览器上下文固件
+@pytest.fixture(scope="function")
+async def async_context(async_browser: AsyncBrowser):
+    """创建异步浏览器上下文"""
+    context = await async_browser.new_context(
+        viewport={"width": 1920, "height": 1080},
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        ignore_https_errors=True,
+    )
+    yield context
+    await context.close()
+
+
+# 异步页面固件
+@pytest.fixture(scope="function")
+async def async_page(async_context: AsyncBrowserContext):
+    """创建异步页面实例"""
+    page = await async_context.new_page()
+
+    # 配置页面选项
+    await page.route(
+        "**/*.{png,jpg,jpeg,gif,svg}", lambda route: route.abort()
+    )  # 阻止加载图片，提高性能
+    page.set_default_timeout(20000)  # 设置默认超时时间为20秒
+    page.set_default_navigation_timeout(30000)  # 设置导航超时时间为30秒
+
+    yield page
+    await page.close()
 
 
 # 自定义登录固件

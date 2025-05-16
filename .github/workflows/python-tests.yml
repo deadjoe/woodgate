@@ -33,15 +33,15 @@ jobs:
 
     - name: Install Playwright browsers
       run: |
-        uv run --system playwright install chromium
+        python -m playwright install chromium
 
     - name: Run tests
       run: |
-        uv run --system pytest --cov=woodgate
+        python -m pytest --cov=woodgate
 
     - name: Generate coverage report
       run: |
-        uv run --system pytest --cov=woodgate --cov-report=xml
+        python -m pytest --cov=woodgate --cov-report=xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

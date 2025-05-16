@@ -1,6 +1,7 @@
 # Woodgate
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python Tests](https://github.com/deadjoe/woodgate/actions/workflows/python-tests.yml/badge.svg)](https://github.com/deadjoe/woodgate/actions/workflows/python-tests.yml)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.40%2B-green)](https://playwright.dev/)
 [![MCP](https://img.shields.io/badge/MCP-1.6%2B-purple)](https://modelcontextprotocol.io/)
@@ -17,7 +18,7 @@
 - 强大的Cookie弹窗处理
 - 详细的日志记录和诊断
 - 模块化设计，便于维护和扩展
-- 完善的单元测试（覆盖率33%）
+- 完善的单元测试（覆盖率70%）
 - 支持uv包管理工具（已测试兼容uv 0.7.2+）
 - 便捷的启动脚本，一键启动服务器
 
@@ -228,7 +229,7 @@ uv run pytest tests/test_with_playwright_fixtures.py
 playwright show-trace trace.zip
 ```
 
-当前项目测试覆盖率为33%，目标是达到70%。
+当前项目测试覆盖率为70%，已达到目标。
 
 ### 代码格式化
 

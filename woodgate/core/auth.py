@@ -38,6 +38,15 @@ async def login_to_redhat_portal(
     Returns:
         bool: 登录成功返回True，否则返回False
     """
+    # 参数验证
+    if not username or not password:
+        logger.error("用户名和密码都必须提供")
+        return False
+
+    if max_retries < 1:
+        logger.error("最大重试次数必须大于0")
+        return False
+
     log_step(f"开始登录Red Hat客户门户 (用户: {username})")
 
     # 访问登录页面
@@ -139,124 +148,135 @@ async def login_to_redhat_portal(
                         loginButton.click();
                         console.log('已点击登录按钮');
 
-                        return {{'success': true}};
+                        // 等待页面加载完成
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+
+                        // 检查是否成功
+                        const success = document.querySelector('.pf-c-dropdown__toggle-text, .user-name, .pf-c-nav__link, .rh-header-logo, .pf-c-page__header, a:has-text("My account")');
+                        if (success) {{
+                            console.log('检测到用户菜单元素，登录成功');
+                            return {{'success': true, 'user_menu': true}};
+                        }}
+
+                        // 检查是否有错误消息
+                        const error = document.querySelector('.kc-feedback-text, .alert-error, .pf-c-alert__title');
+                        if (error) {{
+                            console.error('登录失败:', error.textContent);
+                            return {{'success': false, 'error': error.textContent}};
+                        }}
+
+                        // 如果没有错误消息且没有用户菜单，检查URL
+                        const currentUrl = window.location.href;
+                        if (currentUrl.includes('login') || !currentUrl.includes('redhat')) {{
+                            return {{'success': false, 'error': '登录后URL异常'}};
+                        }}
+
+                        // 如果没有错误消息且没有用户菜单，检查页面元素
+                        const pageElements = document.querySelectorAll('.pf-c-dropdown__toggle-text, .user-name, .pf-c-nav__link, .rh-header-logo, .pf-c-page__header, a:has-text("My account")');
+                        if (pageElements.length > 0) {{
+                            console.log('检测到页面元素，登录成功');
+                            return {{'success': true, 'user_menu': true}};
+                        }}
+
+                        return {{'success': true, 'user_menu': false, 'url': currentUrl}};
                     }} catch (error) {{
                         console.error('JavaScript登录过程中出错:', error);
                         return {{'success': false, 'error': error.toString()}};
                     }}
                 }}
-            """
+                """
             )
+
+            # 确保返回值是字典类型
+            if not isinstance(login_result, dict):
+                login_result = {'success': False, 'error': 'Invalid response format'}
 
             logger.info(f"JavaScript登录结果: {login_result}")
 
-            if login_result.get("success"):
-                log_step("JavaScript登录成功")
-            else:
-                logger.error(f"JavaScript登录失败: {login_result.get('error')}")
+            # 如果JavaScript检测到用户菜单，直接返回成功
+            if login_result.get('user_menu'):
+                logger.info("JavaScript检测到用户菜单，登录成功")
+                return True
 
-                # 如果JavaScript方法失败，尝试截图以便调试
-                try:
-                    screenshot_path = f"login_error_{attempt}.png"
-                    await page.screenshot(path=screenshot_path)
-                    logger.info(f"已保存错误截图到 {screenshot_path}")
-                except Exception as screenshot_error:
-                    logger.error(f"保存截图时出错: {screenshot_error}")
-
-                # 如果不是最后一次尝试，则重试
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(2)
-                    await page.reload()
-                    continue
-                else:
-                    return False
-
-            # 等待页面导航完成
+            # 等待页面加载完成
             try:
                 await page.wait_for_load_state("networkidle", timeout=30000)
             except Exception as e:
-                logger.warning(f"等待页面导航完成时出错: {e}")
+                logger.warning(f"等待页面加载完成时出错: {e}")
 
-            # 检查是否登录成功
-            try:
-                # 检查当前URL
+            # 如果JavaScript登录成功但未检测到用户菜单，继续检查页面状态
+            if login_result.get('success'):
+                # 检查URL
                 current_url = page.url
                 logger.debug(f"当前URL: {current_url}")
 
                 # 如果已离开登录页面，可能登录成功
                 if "login" not in current_url or "customer-portal" in current_url:
                     log_step("已离开登录页面，可能登录成功")
-                    return True
-                else:
-                    # 尝试查找错误消息
-                    error_messages = await page.query_selector_all(
-                        ".pf-c-alert__title, .pf-c-form__helper-text, .pf-c-alert__description"
-                    )
-                    for error in error_messages:
-                        error_text = await error.text_content()
-                        logger.error(f"登录错误消息: {error_text}")
+                    # 检查是否有用户菜单元素
+                    try:
+                        user_menu_selector = ".pf-c-dropdown__toggle-text, .user-name, .pf-c-nav__link, .rh-header-logo, .pf-c-page__header, a:has-text('My account')"
+                        user_menu = await page.query_selector(user_menu_selector)
+                        if user_menu:
+                            log_step("检测到用户菜单元素，登录成功")
+                            return True
+                        else:
+                            logger.warning("未找到用户菜单元素")
+                            # 如果未找到用户菜单但已离开登录页面，也认为登录成功
+                            return True
+                    except Exception as e:
+                        logger.warning(f"检查用户菜单元素时出错: {e}")
+                        # 如果检查用户菜单出错但已离开登录页面，也认为登录成功
+                        return True
 
-                    if attempt < max_retries - 1:
-                        await asyncio.sleep(2)
-                        await page.reload()
-                        continue
-                    else:
-                        return False
-            except Exception as e:
-                logger.error(f"检查登录状态时出错: {e}")
-                if attempt < max_retries - 1:
-                    await asyncio.sleep(2)
-                    await page.reload()
-                    continue
-                else:
-                    return False
-
-            # 等待登录完成，检查是否成功
+            # 检查是否有错误消息
             try:
-                # 等待页面加载完成，检查是否有用户菜单或个人资料元素
-                # 使用更灵活的选择器，并增加超时时间
-                success_selector = ".pf-c-dropdown__toggle-text, .user-name, .pf-c-nav__link, .rh-header-logo, .pf-c-page__header, a:has-text('My account')"
-                await page.wait_for_selector(success_selector, state="visible", timeout=30000)
-                log_step("登录成功！已检测到用户菜单元素")
+                error_selector = ".kc-feedback-text, .alert-error, .pf-c-alert__title"
+                error_elements = await page.query_selector_all(error_selector)
+                for error in error_elements:
+                    error_text = await error.text_content()
+                    logger.error(f"登录失败: {error_text}")
 
-                # 打印Cookie信息，用于诊断
-                await print_cookies(context, "登录成功后")
-
-                return True
+                    # 如果是凭据错误，不再重试
+                    if error_text and (
+                        "invalid" in error_text.lower() or "incorrect" in error_text.lower()
+                    ):
+                        logger.error("凭据无效，停止重试")
+                        return False
             except Exception:
-                # 检查是否有错误消息
-                try:
-                    error_selector = ".kc-feedback-text, .alert-error, .pf-c-alert__title"
-                    error_element = await page.wait_for_selector(
-                        error_selector, state="visible", timeout=3000
-                    )
-                    if error_element:
-                        error_text = await error_element.text_content()
-                        logger.error(f"登录失败: {error_text}")
+                logger.warning("未找到错误消息元素")
 
-                        # 如果是凭据错误，不再重试
-                        if error_text and (
-                            "invalid" in error_text.lower() or "incorrect" in error_text.lower()
-                        ):
-                            logger.error("凭据无效，停止重试")
-                            return False
-                except Exception:
-                    logger.warning("未找到错误消息元素，但登录似乎失败了")
+            # 如果JavaScript登录失败，尝试截图以便调试
+            try:
+                screenshot_path = f"login_error_{attempt}.png"
+                await page.screenshot(path=screenshot_path)
+                logger.info(f"已保存错误截图到 {screenshot_path}")
+            except Exception as screenshot_error:
+                logger.error(f"保存截图时出错: {screenshot_error}")
 
-                if attempt < max_retries - 1:
-                    log_step("登录未成功，将在3秒后重试...")
-                    await asyncio.sleep(3)
-                    await page.reload()
-                    continue
+            # 如果不是最后一次尝试，则重试
+            if attempt < max_retries - 1:
+                log_step("登录未成功，将在3秒后重试...")
+                await asyncio.sleep(3)
+                await page.reload()
+                continue
+            else:
+                logger.error("已达到最大重试次数，登录失败")
+                return False
 
         except Exception as e:
             logger.error(f"登录过程中出错: {e}")
             logger.debug(f"错误堆栈: {traceback.format_exc()}")
+
+            # 如果不是最后一次尝试，则重试
             if attempt < max_retries - 1:
                 log_step("将在3秒后重试...")
                 await asyncio.sleep(3)
                 await page.reload()
                 continue
+            else:
+                logger.error("已达到最大重试次数，登录失败")
+                return False
 
     logger.error(f"登录失败，已尝试 {max_retries} 次")
     return False

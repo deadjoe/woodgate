@@ -155,3 +155,4 @@ test_core_functionality.py
 *.png
 *.jpg
 *.jpeg
+.windsurf/workflows/cnp.md

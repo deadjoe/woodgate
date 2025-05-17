@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="woodgate.png" width="128" height="128" alt="Woodgate Logo" />
+  <img src="woodgate.png" width="512" height="512" alt="Woodgate Logo" />
 </div>
 
 # Woodgate

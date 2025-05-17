@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="woodgate.png" alt="Woodgate Logo" width="300">
+  <img src="woodgate.png" alt="Woodgate Logo" width="128">
 </p>
 
 # Woodgate

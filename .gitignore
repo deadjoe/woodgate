@@ -140,7 +140,6 @@ claude_desktop_config.json
 test_core_functionality.py
 
 # Screenshots
-*.png
 *.jpg
 *.jpeg
 *.orig

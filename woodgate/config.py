@@ -35,9 +35,9 @@ def get_credentials() -> Tuple[str, str]:
         else:
             # 如果默认凭据也未设置，使用固定凭据
             if not username:
-                username = "smartjoe@gmail.com"
+                username = ""
             if not password:
-                password = "***REMOVED***"
+                password = ""
             logger.info("使用固定凭据")
     else:
         logger.info("使用环境变量中的凭据")

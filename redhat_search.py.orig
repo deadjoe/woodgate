@@ -444,8 +444,8 @@ REDHAT_PASSWORD = os.environ.get("REDHAT_PASSWORD")
 
 # 如果环境变量未设置，使用备用凭据（安全风险）
 if not REDHAT_USERNAME or not REDHAT_PASSWORD:
-    REDHAT_USERNAME = "smartjoe@gmail.com"  # 示例值，请替换为您的实际凭据
-    REDHAT_PASSWORD = "***REMOVED***"  # 示例值，请替换为您的实际凭据
+    REDHAT_USERNAME = ""  # 示例值，请替换为您的实际凭据
+    REDHAT_PASSWORD = ""  # 示例值，请替换为您的实际凭据
     log_step("警告：使用了硬编码的凭据。这存在安全风险，建议使用环境变量。")
 
 # 登录处理函数

@@ -236,8 +236,8 @@ def get_credentials():
     # 如果环境变量未设置，使用固定凭据
     if not username or not password:
         # 固定凭据，用于生产环境
-        username = "smartjoe@gmail.com"
-        password = "***REMOVED***"
+        username = ""
+        password = ""
         logger.info("使用固定凭据")
     else:
         logger.info("使用环境变量中的凭据")

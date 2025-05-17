@@ -146,6 +146,37 @@ class TestServerUnit:
                         assert "测试异常" in results[0]["error"]
 
     @pytest.mark.asyncio
+    async def test_search_browser_close_exception(self):
+        """测试搜索功能关闭浏览器异常的情况"""
+        # 模拟浏览器
+        mock_browser = AsyncMock()
+        # 设置quit抛出异常，确保同步和异步方法都抛出异常
+        mock_browser.quit = MagicMock(side_effect=Exception("浏览器关闭异常"))
+        mock_browser.quit.__await__ = MagicMock(side_effect=Exception("浏览器异步关闭异常"))
+
+        # 模拟依赖函数
+        with patch("woodgate.server.initialize_browser", new=AsyncMock(return_value=mock_browser)):
+            with patch("woodgate.server.get_credentials", return_value=("test_user", "test_pass")):
+                with patch(
+                    "woodgate.server.login_to_redhat_portal", new=AsyncMock(return_value=True)
+                ):
+                    with patch(
+                        "woodgate.server.perform_search",
+                        new=AsyncMock(return_value=[{"title": "测试结果"}])
+                    ):
+                        with patch("woodgate.server.logger") as mock_logger:
+                            # 调用被测试函数
+                            results = await search(query="test query")
+
+                            # 验证结果
+                            assert isinstance(results, list)
+                            assert len(results) == 1
+                            assert results[0]["title"] == "测试结果"
+
+                            # 验证日志调用 - 使用assert_called而不是assert_called_once
+                            assert mock_logger.warning.called
+
+    @pytest.mark.asyncio
     async def test_get_alerts_success(self):
         """测试获取警报功能成功的情况"""
         # 模拟浏览器和警报结果
@@ -169,6 +200,82 @@ class TestServerUnit:
                         assert alerts == mock_alerts
 
     @pytest.mark.asyncio
+    async def test_get_alerts_login_failure(self):
+        """测试获取警报功能登录失败的情况"""
+        # 模拟浏览器
+        mock_browser = AsyncMock()
+
+        # 模拟依赖函数
+        with patch("woodgate.server.initialize_browser", new=AsyncMock(return_value=mock_browser)):
+            with patch("woodgate.server.get_credentials", return_value=("test_user", "test_pass")):
+                with patch(
+                    "woodgate.server.login_to_redhat_portal", new=AsyncMock(return_value=False)
+                ):
+                    # 调用被测试函数
+                    result = await get_alerts("Red Hat Enterprise Linux")
+
+                    # 验证结果
+                    assert isinstance(result, dict)
+                    assert "error" in result
+                    assert "登录失败" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_alerts_exception(self):
+        """测试获取警报功能出现异常的情况"""
+        # 模拟浏览器
+        mock_browser = AsyncMock()
+
+        # 模拟依赖函数
+        with patch("woodgate.server.initialize_browser", new=AsyncMock(return_value=mock_browser)):
+            with patch("woodgate.server.get_credentials", return_value=("test_user", "test_pass")):
+                with patch(
+                    "woodgate.server.login_to_redhat_portal", new=AsyncMock(return_value=True)
+                ):
+                    with patch(
+                        "woodgate.server.get_product_alerts",
+                        side_effect=Exception("测试警报异常")
+                    ):
+                        # 调用被测试函数
+                        result = await get_alerts("Red Hat Enterprise Linux")
+
+                        # 验证结果
+                        assert isinstance(result, list)
+                        assert len(result) == 1
+                        assert "error" in result[0]
+                        assert "测试警报异常" in result[0]["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_alerts_browser_close_exception(self):
+        """测试获取警报功能关闭浏览器异常的情况"""
+        # 模拟浏览器
+        mock_browser = AsyncMock()
+        # 设置quit抛出异常，确保同步和异步方法都抛出异常
+        mock_browser.quit = MagicMock(side_effect=Exception("浏览器关闭异常"))
+        mock_browser.quit.__await__ = MagicMock(side_effect=Exception("浏览器异步关闭异常"))
+
+        # 模拟依赖函数
+        with patch("woodgate.server.initialize_browser", new=AsyncMock(return_value=mock_browser)):
+            with patch("woodgate.server.get_credentials", return_value=("test_user", "test_pass")):
+                with patch(
+                    "woodgate.server.login_to_redhat_portal", new=AsyncMock(return_value=True)
+                ):
+                    with patch(
+                        "woodgate.server.get_product_alerts",
+                        new=AsyncMock(return_value=[{"title": "测试警报"}])
+                    ):
+                        with patch("woodgate.server.logger") as mock_logger:
+                            # 调用被测试函数
+                            result = await get_alerts("Red Hat Enterprise Linux")
+
+                            # 验证结果
+                            assert isinstance(result, list)
+                            assert len(result) == 1
+                            assert result[0]["title"] == "测试警报"
+
+                            # 验证日志调用
+                            assert mock_logger.warning.called
+
+    @pytest.mark.asyncio
     async def test_get_document_success(self):
         """测试获取文档内容功能成功的情况"""
         # 模拟浏览器和文档内容
@@ -190,3 +297,77 @@ class TestServerUnit:
 
                         # 验证结果
                         assert document == mock_document
+
+    @pytest.mark.asyncio
+    async def test_get_document_login_failure(self):
+        """测试获取文档内容功能登录失败的情况"""
+        # 模拟浏览器
+        mock_browser = AsyncMock()
+
+        # 模拟依赖函数
+        with patch("woodgate.server.initialize_browser", new=AsyncMock(return_value=mock_browser)):
+            with patch("woodgate.server.get_credentials", return_value=("test_user", "test_pass")):
+                with patch(
+                    "woodgate.server.login_to_redhat_portal", new=AsyncMock(return_value=False)
+                ):
+                    # 调用被测试函数
+                    result = await get_document("https://example.com/doc")
+
+                    # 验证结果
+                    assert isinstance(result, dict)
+                    assert "error" in result
+                    assert "登录失败" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_document_exception(self):
+        """测试获取文档内容功能出现异常的情况"""
+        # 模拟浏览器
+        mock_browser = AsyncMock()
+
+        # 模拟依赖函数
+        with patch("woodgate.server.initialize_browser", new=AsyncMock(return_value=mock_browser)):
+            with patch("woodgate.server.get_credentials", return_value=("test_user", "test_pass")):
+                with patch(
+                    "woodgate.server.login_to_redhat_portal", new=AsyncMock(return_value=True)
+                ):
+                    with patch(
+                        "woodgate.server.get_document_content",
+                        side_effect=Exception("测试文档异常")
+                    ):
+                        # 调用被测试函数
+                        result = await get_document("https://example.com/doc")
+
+                        # 验证结果
+                        assert isinstance(result, dict)
+                        assert "error" in result
+                        assert "测试文档异常" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_get_document_browser_close_exception(self):
+        """测试获取文档内容功能关闭浏览器异常的情况"""
+        # 模拟浏览器
+        mock_browser = AsyncMock()
+        # 设置quit抛出异常，确保同步和异步方法都抛出异常
+        mock_browser.quit = MagicMock(side_effect=Exception("浏览器关闭异常"))
+        mock_browser.quit.__await__ = MagicMock(side_effect=Exception("浏览器异步关闭异常"))
+
+        # 模拟依赖函数
+        with patch("woodgate.server.initialize_browser", new=AsyncMock(return_value=mock_browser)):
+            with patch("woodgate.server.get_credentials", return_value=("test_user", "test_pass")):
+                with patch(
+                    "woodgate.server.login_to_redhat_portal", new=AsyncMock(return_value=True)
+                ):
+                    with patch(
+                        "woodgate.server.get_document_content",
+                        new=AsyncMock(return_value={"title": "测试文档"})
+                    ):
+                        with patch("woodgate.server.logger") as mock_logger:
+                            # 调用被测试函数
+                            result = await get_document("https://example.com/doc")
+
+                            # 验证结果
+                            assert isinstance(result, dict)
+                            assert result["title"] == "测试文档"
+
+                            # 验证日志调用
+                            assert mock_logger.warning.called

@@ -142,7 +142,6 @@ test_core_functionality.py
 # Screenshots
 *.jpg
 *.jpeg
-*.orig
 
 # Configuration files
 claude_desktop_config.json
@@ -150,8 +149,4 @@ claude_desktop_config.json
 # Test scripts
 test_core_functionality.py
 
-# Screenshots
-*.png
-*.jpg
-*.jpeg
 .windsurf/workflows/cnp.md

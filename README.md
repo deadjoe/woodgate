@@ -6,8 +6,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python Tests](https://github.com/deadjoe/woodgate/actions/workflows/python-tests.yml/badge.svg)](https://github.com/deadjoe/woodgate/actions/workflows/python-tests.yml)
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/downloads/)
-[![Playwright](https://img.shields.io/badge/Playwright-1.40%2B-green)](https://playwright.dev/)
+[![Python Version](https://img.shields.io/badge/python-3.10--3.12-blue)](https://www.python.org/downloads/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.44%2B-green)](https://playwright.dev/)
 [![MCP](https://img.shields.io/badge/MCP-1.6%2B-purple)](https://modelcontextprotocol.io/)
 
 一个基于Model Context Protocol (MCP)的服务器，用于自动化搜索和从Red Hat客户门户提取数据。
@@ -28,10 +28,10 @@
 
 ## 系统要求
 
-- Python 3.10+
+- Python 3.10-3.12
 - 必要的Python包（见`requirements.txt`）
 - MCP SDK 1.6+
-- Playwright 1.40+（会自动安装浏览器）
+- Playwright 1.44+（会自动安装浏览器）
 
 ## 安装
 
@@ -74,6 +74,10 @@
 
    # 日志配置
    export WOODGATE_LOG_LEVEL="INFO"  # 日志级别
+   export PYTHONUNBUFFERED=1  # 禁用Python输出缓冲
+   export LOGLEVEL=DEBUG      # 设置日志级别为DEBUG
+   export PYTHONTRACEMALLOC=1 # 启用内存分配跟踪
+   export PYTHONASYNCIODEBUG=1 # 启用asyncio调试
 
    # 重试配置
    export WOODGATE_MAX_RETRIES="3"  # 最大重试次数
@@ -199,6 +203,17 @@ document_types = mcp.resources["config://doc-types"]
 
 ## 开发
 
+### 持续集成
+
+项目使用GitHub Actions进行持续集成，配置文件位于`.github/workflows/python-tests.yml`。每次推送到main分支或创建Pull Request时，会自动运行测试并生成覆盖率报告。
+
+CI流程包括：
+
+- 在多个Python版本（3.10、3.11、3.12）上运行测试
+- 安装依赖和Playwright浏览器
+- 运行所有测试并生成覆盖率报告
+- 上传覆盖率报告到Codecov
+
 ### 运行测试
 
 ```bash
@@ -233,13 +248,29 @@ uv run pytest tests/test_with_playwright_fixtures.py
 playwright show-trace trace.zip
 ```
 
-
 ### 代码格式化
 
 ```bash
+# 使用black格式化代码
 uv run black woodgate tests
+
+# 使用isort排序导入
 uv run isort woodgate tests
+
+# 使用flake8检查代码质量
 uv run flake8 woodgate tests
+
+# 使用ruff进行快速代码检查和修复
+uv run ruff check woodgate tests
+uv run ruff check --fix woodgate tests
+```
+
+### 测试覆盖率
+
+项目的测试覆盖率目标为70%以上。可以使用以下命令查看当前的测试覆盖率：
+
+```bash
+uv run pytest --cov=woodgate --cov-report=term-missing
 ```
 
 ## 项目结构
@@ -337,6 +368,26 @@ chmod +x start_server.sh
 # 运行脚本
 ./start_server.sh
 ```
+
+## 文档
+
+- **README.md**: 项目概述、安装和使用说明
+- **DESIGN.md**: 详细的技术设计文档，包括架构、模块和工作流程
+- **playwright_guide.md**: Playwright使用指南，包括API参考和最佳实践
+
+## 版本控制与.gitignore
+
+项目使用Git进行版本控制，并配置了.gitignore文件以排除以下内容：
+
+- Python缓存文件（`__pycache__/`, `*.py[cod]`）
+- 虚拟环境目录（`.venv/`, `env/`）
+- 构建和分发文件（`build/`, `dist/`, `*.egg-info/`）
+- 测试覆盖率报告（`.coverage`, `coverage.xml`）
+- 敏感文件（`*credentials*.txt`, `*password*.txt`, `*secret*.txt`）
+- 系统特定文件（`.DS_Store`）
+- 临时文件和备份（`*.bak`, `*.orig`）
+
+提交代码前请确保不包含敏感信息和不必要的临时文件。
 
 ## 许可证
 

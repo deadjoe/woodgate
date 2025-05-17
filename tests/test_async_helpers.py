@@ -19,16 +19,35 @@ def wrap_async_mock(mock_obj):
     Returns:
         包装后的AsyncMock对象
     """
+    # 特殊方法列表，这些方法在browser.py中被调用但没有await
+    special_methods = [
+        "set_default_timeout",
+        "set_default_navigation_timeout",
+        "add_locator_handler",
+        "on",
+        "locator",
+        "get_by_text",
+        "route"
+    ]
+
+    # 为特殊方法创建同步版本
+    for method_name in special_methods:
+        if hasattr(mock_obj, method_name):
+            # 创建一个新的方法，它不会返回协程
+            new_method = AsyncMock()
+            # 替换原始方法
+            setattr(mock_obj, method_name, new_method)
+
+    # 处理其他方法
     original_methods = {}
 
     # 保存原始方法
     for name, method in inspect.getmembers(mock_obj, inspect.ismethod):
-        if not name.startswith("_"):
+        if not name.startswith("_") and name not in special_methods:
             original_methods[name] = method
 
     # 包装方法
     for name, method in original_methods.items():
-
         async def wrapped_method(*args, _method=method, **kwargs):
             result = _method(*args, **kwargs)
             if asyncio.iscoroutine(result):

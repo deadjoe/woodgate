@@ -30,6 +30,7 @@ class TestMCPServer:
         assert mcp is not None
         assert hasattr(mcp, "name")
         assert mcp.name == "Woodgate"
+        # 注意：FastMCP对象可能不会直接暴露version属性，所以我们不检查它
 
     def test_mcp_tool_decorator(self):
         """测试MCP工具装饰器"""

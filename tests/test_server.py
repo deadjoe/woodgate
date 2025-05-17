@@ -25,10 +25,11 @@ class TestServerBasic:
 
     def test_mcp_server_initialization(self):
         """测试MCP服务器初始化"""
-        # 只检查name属性，因为FastMCP对象可能没有其他属性
-        assert mcp.name == "Woodgate"
         # 检查mcp对象是否存在
         assert mcp is not None
+        # 检查基本属性
+        assert mcp.name == "Woodgate"
+        # 注意：FastMCP对象可能不会直接暴露version和dependencies属性，所以我们不检查它们
 
     def test_available_products(self):
         """测试获取可用产品列表"""
@@ -118,10 +119,11 @@ class TestServerUnit:
                     # 调用被测试函数
                     results = await search(query="test query")
 
-                    # 验证结果 - 结果是一个字典，不是列表
-                    assert isinstance(results, dict)
-                    assert "error" in results
-                    assert "登录失败" in results["error"]
+                    # 验证结果 - 结果是一个列表，包含一个错误字典
+                    assert isinstance(results, list)
+                    assert len(results) == 1
+                    assert "error" in results[0]
+                    assert "登录失败" in results[0]["error"]
 
     @pytest.mark.asyncio
     async def test_search_exception(self):
@@ -215,9 +217,10 @@ class TestServerUnit:
                     result = await get_alerts("Red Hat Enterprise Linux")
 
                     # 验证结果
-                    assert isinstance(result, dict)
-                    assert "error" in result
-                    assert "登录失败" in result["error"]
+                    assert isinstance(result, list)
+                    assert len(result) == 1
+                    assert "error" in result[0]
+                    assert "登录失败" in result[0]["error"]
 
     @pytest.mark.asyncio
     async def test_get_alerts_exception(self):

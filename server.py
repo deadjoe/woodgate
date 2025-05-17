@@ -11,7 +11,40 @@ import subprocess
 import importlib.util
 import traceback
 import urllib.parse
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, TypedDict, Union
+
+# 定义结构化类型
+class SearchResult(TypedDict):
+    """搜索结果类型"""
+    title: str
+    url: str
+    summary: Optional[str]
+    doc_type: Optional[str]
+    last_updated: Optional[str]
+
+class AlertInfo(TypedDict):
+    """警报信息类型"""
+    title: str
+    severity: str
+    url: Optional[str]
+    summary: Optional[str]
+    published_date: Optional[str]
+
+class DocumentContent(TypedDict):
+    """文档内容类型"""
+    title: str
+    content: str
+    url: str
+    metadata: Dict[str, str]
+
+class ErrorResponse(TypedDict):
+    """错误响应类型"""
+    error: str
+
+# 组合类型
+SearchResults = List[Union[SearchResult, ErrorResponse]]
+AlertResults = List[Union[AlertInfo, ErrorResponse]]
+DocumentResult = Union[DocumentContent, ErrorResponse]
 
 # 环境变量应该在运行时设置，而不是硬编码在代码中
 # 例如: export REDHAT_USERNAME="your_username" && export REDHAT_PASSWORD="your_password"
@@ -96,8 +129,11 @@ except ImportError as e:
 # 创建MCP服务器
 mcp = FastMCP(
     name="Woodgate",
-    instructions="Red Hat客户门户搜索工具，提供登录、搜索和文档获取功能。",
+    description="Red Hat客户门户搜索工具，提供登录、搜索和文档获取功能。",
+    version="1.0.0",  # 添加版本号
     log_level="DEBUG",  # 设置日志级别为DEBUG
+    dependencies=["playwright", "httpx"],  # 声明依赖
+    stateless_http=True,  # 支持无状态HTTP传输
 )
 
 # 添加自定义日志记录
@@ -1506,7 +1542,7 @@ async def search(
     page: int = 1,
     rows: int = 20,
     sort_by: str = "relevant",
-) -> List[Dict[str, Any]]:
+) -> SearchResults:
     """
     在Red Hat客户门户中执行搜索
 
@@ -1570,26 +1606,30 @@ async def search(
     page_obj = None
 
     try:
-        print("初始化浏览器...")
-        logger.info("初始化浏览器...")
-        playwright, browser, context, page_obj = await initialize_browser()
+        print("初始化浏览器和获取凭据...")
+        logger.info("初始化浏览器和获取凭据...")
+
+        # 并行初始化浏览器和获取凭据
+        browser_task = asyncio.create_task(initialize_browser())
+        credentials_task = asyncio.to_thread(get_credentials)
+
+        # 等待两个任务完成
+        (playwright, browser, context, page_obj), credentials_result = await asyncio.gather(
+            browser_task, credentials_task
+        )
+
+        # 解析凭据结果
+        username, password = credentials_result
+        print(f"凭据获取成功: username='{username}'")
+        logger.info(f"凭据获取成功: username='{username}'")
+
+        # 检查浏览器初始化是否成功
         if playwright is None or browser is None or context is None or page_obj is None:
             print("浏览器初始化失败，某些组件为None")
             logger.error("浏览器初始化失败，某些组件为None")
             return [{"error": "浏览器初始化失败，某些组件为None"}]
         print("浏览器初始化成功")
         logger.info("浏览器初始化成功")
-
-        print("获取凭据...")
-        logger.info("获取凭据...")
-        try:
-            username, password = get_credentials()
-            print(f"凭据获取成功: username='{username}'")
-            logger.info(f"凭据获取成功: username='{username}'")
-        except Exception as e:
-            print(f"获取凭据失败: {e}")
-            logger.error(f"获取凭据失败: {e}")
-            return [{"error": f"获取凭据失败: {str(e)}"}]
 
         print("登录到Red Hat客户门户...")
         logger.info("登录到Red Hat客户门户...")
@@ -1636,7 +1676,7 @@ async def search(
 
 
 @mcp.tool()
-async def get_alerts(product: str) -> List[Dict[str, Any]]:
+async def get_alerts(product: str) -> AlertResults:
     """
     获取特定产品的警报信息
 
@@ -1654,17 +1694,23 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
     page_obj = None
 
     try:
-        playwright, browser, context, page_obj = await initialize_browser()
+        # 并行初始化浏览器和获取凭据
+        browser_task = asyncio.create_task(initialize_browser())
+        credentials_task = asyncio.to_thread(get_credentials)
+
+        # 等待两个任务完成
+        (playwright, browser, context, page_obj), credentials_result = await asyncio.gather(
+            browser_task, credentials_task
+        )
+
+        # 解析凭据结果
+        username, password = credentials_result
+        logger.debug(f"凭据获取成功: username='{username}'")
+
+        # 检查浏览器初始化是否成功
         if playwright is None or browser is None or context is None or page_obj is None:
             logger.error("浏览器初始化失败，某些组件为None")
-            return [{"error": "浏览器初始化失败，某些组件为None"}]
-
-        try:
-            username, password = get_credentials()
-            logger.debug(f"凭据获取成功: username='{username}'")
-        except Exception as e:
-            logger.error(f"获取凭据失败: {e}")
-            return [{"error": f"获取凭据失败: {str(e)}"}]
+            return [{"error": "浏览器初始化失败，无法获取警报"}]
 
         login_success = await login_to_redhat_portal(page_obj, context, username, password)
         if not login_success:
@@ -1686,7 +1732,7 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
 
 
 @mcp.tool()
-async def get_document(document_url: str) -> Dict[str, Any]:
+async def get_document(document_url: str) -> DocumentResult:
     """
     获取特定文档的详细内容
 
@@ -1704,17 +1750,23 @@ async def get_document(document_url: str) -> Dict[str, Any]:
     page_obj = None
 
     try:
-        playwright, browser, context, page_obj = await initialize_browser()
+        # 并行初始化浏览器和获取凭据
+        browser_task = asyncio.create_task(initialize_browser())
+        credentials_task = asyncio.to_thread(get_credentials)
+
+        # 等待两个任务完成
+        (playwright, browser, context, page_obj), credentials_result = await asyncio.gather(
+            browser_task, credentials_task
+        )
+
+        # 解析凭据结果
+        username, password = credentials_result
+        logger.debug(f"凭据获取成功: username='{username}'")
+
+        # 检查浏览器初始化是否成功
         if playwright is None or browser is None or context is None or page_obj is None:
             logger.error("浏览器初始化失败，某些组件为None")
-            return {"error": "浏览器初始化失败，某些组件为None"}
-
-        try:
-            username, password = get_credentials()
-            logger.debug(f"凭据获取成功: username='{username}'")
-        except Exception as e:
-            logger.error(f"获取凭据失败: {e}")
-            return {"error": f"获取凭据失败: {str(e)}"}
+            return {"error": "浏览器初始化失败，无法获取文档内容"}
 
         login_success = await login_to_redhat_portal(page_obj, context, username, password)
         if not login_success:
@@ -1735,13 +1787,13 @@ async def get_document(document_url: str) -> Dict[str, Any]:
             logger.warning(f"关闭浏览器时出错: {e}")
 
 
-@mcp.resource("config://products")
+@mcp.resource("redhat://products")
 def get_available_products_resource() -> List[str]:
     """获取可用的产品列表"""
     return get_available_products()
 
 
-@mcp.resource("config://doc-types")
+@mcp.resource("redhat://doc-types")
 def get_document_types_resource() -> List[str]:
     """获取可用的文档类型"""
     return get_document_types()

@@ -3,9 +3,45 @@ MCP服务器模块 - 实现Model Context Protocol服务器
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict, Union
 
 from mcp.server.fastmcp import FastMCP
+
+# 定义结构化类型
+class SearchResult(TypedDict):
+    """搜索结果类型"""
+    title: str
+    url: str
+    description: Optional[str]
+    doc_type: Optional[str]
+    last_modified: Optional[str]
+    score: Optional[float]
+
+class AlertInfo(TypedDict):
+    """警报信息类型"""
+    title: str
+    severity: str
+    issued: Optional[str]
+    cve: Optional[str]
+    url: Optional[str]
+    description: Optional[str]
+
+class DocumentContent(TypedDict):
+    """文档内容类型"""
+    title: str
+    content: str
+    url: str
+    doc_type: Optional[str]
+    last_modified: Optional[str]
+
+class ErrorResponse(TypedDict):
+    """错误响应类型"""
+    error: str
+
+# 组合类型
+SearchResults = List[Union[SearchResult, ErrorResponse]]
+AlertResults = List[Union[AlertInfo, ErrorResponse]]
+DocumentResult = Union[DocumentContent, ErrorResponse]
 
 from .config import get_available_products, get_credentials, get_document_types
 from .core.auth import login_to_redhat_portal
@@ -21,9 +57,12 @@ logger = logging.getLogger(__name__)
 mcp = FastMCP(
     "Woodgate",
     description="Red Hat客户门户搜索工具",
+    version="1.0.0",  # 添加版本号
     host="0.0.0.0",  # 默认监听所有接口
     port=8000,  # 默认端口
     log_level="INFO",  # 默认日志级别
+    dependencies=["playwright", "httpx"],  # 声明依赖
+    stateless_http=True,  # 支持无状态HTTP传输
 )
 
 
@@ -35,7 +74,7 @@ async def search(
     page: int = 1,
     rows: int = 20,
     sort_by: str = "relevant",
-) -> List[Dict[str, Any]]:
+) -> SearchResults:
     """
     在Red Hat客户门户中执行搜索
 
@@ -54,12 +93,28 @@ async def search(
 
     browser = None
     try:
-        browser = await initialize_browser()
-        username, password = get_credentials()
+        # 并行初始化浏览器和获取凭据
+        import asyncio
+
+        # 使用asyncio.to_thread将同步函数转换为异步操作
+        browser_task = asyncio.create_task(initialize_browser())
+        credentials_task = asyncio.to_thread(get_credentials)
+
+        # 等待两个任务完成
+        browser, credentials_result = await asyncio.gather(browser_task, credentials_task)
+        username, password = credentials_result
+
+        # 检查浏览器初始化是否成功
+        if browser is None:
+            logger.error("浏览器初始化失败")
+            return [{"error": "浏览器初始化失败，无法执行搜索"}]
+
+        # 执行登录
         login_success = await login_to_redhat_portal(browser, username, password)
         if not login_success:
-            return {"error": "登录失败，请检查凭据"}
+            return [{"error": "登录失败，请检查凭据"}]
 
+        # 执行搜索
         results = await perform_search(
             browser,
             query=query,
@@ -90,7 +145,7 @@ async def search(
 
 
 @mcp.tool()
-async def get_alerts(product: str) -> List[Dict[str, Any]]:
+async def get_alerts(product: str) -> AlertResults:
     """
     获取特定产品的警报信息
 
@@ -104,12 +159,28 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
 
     browser = None
     try:
-        browser = await initialize_browser()
-        username, password = get_credentials()
+        # 并行初始化浏览器和获取凭据
+        import asyncio
+
+        # 使用asyncio.to_thread将同步函数转换为异步操作
+        browser_task = asyncio.create_task(initialize_browser())
+        credentials_task = asyncio.to_thread(get_credentials)
+
+        # 等待两个任务完成
+        browser, credentials_result = await asyncio.gather(browser_task, credentials_task)
+        username, password = credentials_result
+
+        # 检查浏览器初始化是否成功
+        if browser is None:
+            logger.error("浏览器初始化失败")
+            return [{"error": "浏览器初始化失败，无法获取警报"}]
+
+        # 执行登录
         login_success = await login_to_redhat_portal(browser, username, password)
         if not login_success:
-            return {"error": "登录失败，请检查凭据"}
+            return [{"error": "登录失败，请检查凭据"}]
 
+        # 获取产品警报
         alerts = await get_product_alerts(browser, product)
         return alerts
     except Exception as e:
@@ -132,7 +203,7 @@ async def get_alerts(product: str) -> List[Dict[str, Any]]:
 
 
 @mcp.tool()
-async def get_document(document_url: str) -> Dict[str, Any]:
+async def get_document(document_url: str) -> DocumentResult:
     """
     获取特定文档的详细内容
 
@@ -146,12 +217,28 @@ async def get_document(document_url: str) -> Dict[str, Any]:
 
     browser = None
     try:
-        browser = await initialize_browser()
-        username, password = get_credentials()
+        # 并行初始化浏览器和获取凭据
+        import asyncio
+
+        # 使用asyncio.to_thread将同步函数转换为异步操作
+        browser_task = asyncio.create_task(initialize_browser())
+        credentials_task = asyncio.to_thread(get_credentials)
+
+        # 等待两个任务完成
+        browser, credentials_result = await asyncio.gather(browser_task, credentials_task)
+        username, password = credentials_result
+
+        # 检查浏览器初始化是否成功
+        if browser is None:
+            logger.error("浏览器初始化失败")
+            return {"error": "浏览器初始化失败，无法获取文档内容"}
+
+        # 执行登录
         login_success = await login_to_redhat_portal(browser, username, password)
         if not login_success:
             return {"error": "登录失败，请检查凭据"}
 
+        # 获取文档内容
         document = await get_document_content(browser, document_url)
         return document
     except Exception as e:
@@ -173,19 +260,19 @@ async def get_document(document_url: str) -> Dict[str, Any]:
             logger.warning(f"关闭浏览器时出错: {e}")
 
 
-@mcp.resource("config://products")
+@mcp.resource("redhat://products")
 def available_products() -> List[str]:
     """获取可用的产品列表"""
     return get_available_products()
 
 
-@mcp.resource("config://doc-types")
+@mcp.resource("redhat://doc-types")
 def document_types() -> List[str]:
     """获取可用的文档类型"""
     return get_document_types()
 
 
-@mcp.resource("config://search-params")
+@mcp.resource("redhat://search-params")
 def search_params() -> Dict[str, Any]:
     """获取搜索参数配置"""
     return {

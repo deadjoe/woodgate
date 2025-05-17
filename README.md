@@ -1,6 +1,6 @@
-<div align="center">
-  <img src="woodgate.png" width="256" height="256" alt="Woodgate Logo" />
-</div>
+<p align="center">
+  <img src="woodgate.png" alt="Woodgate Logo" width="300">
+</p>
 
 # Woodgate
 

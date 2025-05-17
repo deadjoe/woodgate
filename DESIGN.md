@@ -17,7 +17,7 @@ Woodgate 采用模块化架构，主要由以下几个部分组成：
 
 ### 架构图
 
-```
+```ascii
 +---------------------+     +----------------------+
 | Claude Desktop      |     | 独立运行模式          |
 | (MCP 客户端)        |     | (命令行/API)         |
@@ -198,6 +198,156 @@ uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 - 确保凭据信息不被提交到公共代码仓库
 - 使用 HTTPS 进行安全通信
 
+## MCP 设计与实现详解
+
+### MCP 架构概述
+
+Model Context Protocol (MCP) 是一种用于 AI 助手与外部工具通信的协议，Woodgate 项目基于此协议实现了与 Claude Desktop 的无缝集成。MCP 架构在 Woodgate 中的实现包括以下关键组件：
+
+1. **MCP 服务器**：基于 `FastMCP` 类实现，负责处理客户端请求和响应
+2. **工具函数**：使用 `@mcp.tool()` 装饰器定义，提供核心功能接口
+3. **资源定义**：使用 `@mcp.resource()` 装饰器定义，提供静态或动态数据
+4. **提示模板**：使用 `@mcp.prompt()` 装饰器定义，提供使用指南和示例
+
+### MCP 服务器配置
+
+Woodgate 的 MCP 服务器配置采用了以下最佳实践：
+
+```python
+mcp = FastMCP(
+    name="Woodgate",
+    description="Red Hat客户门户搜索工具",
+    version="1.0.0",  # 明确的版本声明
+    host="0.0.0.0",   # 监听所有接口
+    port=8000,        # 默认端口
+    log_level="INFO", # 日志级别
+    dependencies=["playwright", "httpx"],  # 声明依赖
+    stateless_http=True,  # 支持无状态HTTP传输
+)
+```
+
+这种配置确保了服务器的可发现性、可维护性和兼容性，同时明确声明了版本和依赖关系。
+
+### 类型系统与数据结构
+
+为了提高代码的类型安全性和可读性，Woodgate 使用 TypedDict 定义了结构化的返回类型：
+
+```python
+class SearchResult(TypedDict):
+    """搜索结果类型"""
+    title: str
+    url: str
+    description: Optional[str]
+    doc_type: Optional[str]
+    last_modified: Optional[str]
+    score: Optional[float]
+
+# 组合类型
+SearchResults = List[Union[SearchResult, ErrorResponse]]
+```
+
+这种类型定义使 AI 助手能够更好地理解数据结构，提供更准确的建议和响应。
+
+### 工具函数实现
+
+Woodgate 的核心功能通过 MCP 工具函数暴露给客户端：
+
+```python
+@mcp.tool()
+async def search(
+    query: str,
+    products: Optional[List[str]] = None,
+    doc_types: Optional[List[str]] = None,
+    page: int = 1,
+    rows: int = 20,
+    sort_by: str = "relevant",
+) -> SearchResults:
+    """在Red Hat客户门户中执行搜索"""
+    # 实现细节...
+```
+
+每个工具函数都有明确的参数类型注解和返回类型，并提供了详细的文档字符串，使 AI 助手能够正确理解和使用这些功能。
+
+### 资源 URI 设计
+
+Woodgate 使用描述性的 URI 前缀来标识资源，提高了资源的可发现性和语义清晰度：
+
+```python
+@mcp.resource("redhat://products")
+def available_products() -> List[str]:
+    """获取可用的产品列表"""
+    return get_available_products()
+```
+
+这种 URI 设计使资源的来源和用途一目了然，有助于 AI 助手更好地理解和使用这些资源。
+
+### 异步处理优化
+
+Woodgate 使用现代异步编程技术优化了 MCP 服务器的性能：
+
+```python
+# 并行初始化浏览器和获取凭据
+browser_task = asyncio.create_task(initialize_browser())
+credentials_task = asyncio.to_thread(get_credentials)
+
+# 等待两个任务完成
+browser, credentials_result = await asyncio.gather(browser_task, credentials_task)
+```
+
+这种并行处理方式显著提高了服务器的响应速度，特别是在处理浏览器初始化和网络请求等 I/O 密集型操作时。
+
+### 错误处理与恢复
+
+Woodgate 实现了全面的错误处理机制，确保 MCP 服务器在遇到异常时能够优雅地恢复：
+
+```python
+try:
+    # 操作代码...
+except Exception as e:
+    logger.error(f"操作过程中出错: {e}")
+    logger.error(f"错误堆栈: {traceback.format_exc()}")
+    return [{"error": f"操作过程中出错: {str(e)}"}]
+finally:
+    # 清理资源...
+```
+
+这种错误处理模式确保了即使在出现异常的情况下，服务器也能返回有用的错误信息，并正确清理资源。
+
+### MCP 集成流程
+
+Woodgate 与 Claude Desktop 的集成流程如下：
+
+1. **安装 MCP 服务器**：
+
+   ```bash
+   .venv/bin/mcp install server.py:mcp --name "Red Hat KB Search"
+   ```
+
+2. **客户端发现**：Claude Desktop 自动发现并加载已安装的 MCP 服务器
+
+3. **工具调用**：Claude 使用 MCP 协议调用 Woodgate 提供的工具函数
+
+4. **结果处理**：Woodgate 执行请求并返回结构化结果，Claude 将结果呈现给用户
+
+### MCP 安全考虑
+
+Woodgate 的 MCP 实现考虑了以下安全因素：
+
+1. **凭据管理**：凭据存储在服务器端，不需要在客户端配置
+2. **错误隔离**：工具函数中的错误不会影响整个 MCP 服务器的稳定性
+3. **输入验证**：对客户端输入进行验证，防止注入攻击
+4. **资源限制**：实现超时机制，防止长时间运行的操作阻塞服务器
+
+### MCP 测试策略
+
+Woodgate 对 MCP 实现采用了全面的测试策略：
+
+1. **单元测试**：测试各个工具函数和资源的独立功能
+2. **集成测试**：测试 MCP 服务器与其他模块的交互
+3. **端到端测试**：模拟 Claude Desktop 调用 MCP 服务器的完整流程
+
+测试覆盖了正常操作、错误处理和边缘情况，确保 MCP 实现的健壮性和可靠性。
+
 ## 未来扩展
 
 - 支持更多 Red Hat 产品和服务
@@ -205,3 +355,5 @@ uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 - 改进文档内容提取和格式化
 - 添加缓存机制提高性能
 - 支持更多浏览器和平台
+- 实现 MCP 认证机制，支持多用户场景
+- 添加 MCP 事件通知，提供实时更新

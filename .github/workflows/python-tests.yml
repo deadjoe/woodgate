@@ -28,23 +28,57 @@ jobs:
 
     - name: Install dependencies
       run: |
-        uv pip install --system pytest pytest-cov pytest-asyncio pytest-playwright
-        uv pip install --system -e .
+        uv pip install --system -e ".[dev]"
 
     - name: Install Playwright browsers
       run: |
         python -m playwright install chromium
 
+    - name: Lint with ruff
+      run: |
+        uv run ruff check woodgate tests
+
+    - name: Check types with mypy
+      run: |
+        uv run mypy woodgate
+
     - name: Run tests
       run: |
-        python -m pytest --cov=woodgate
+        uv run pytest -v --cov=woodgate
 
     - name: Generate coverage report
       run: |
-        python -m pytest --cov=woodgate --cov-report=xml
+        uv run pytest --cov=woodgate --cov-report=xml
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
+
+  docs:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        uv pip install --system -e ".[dev]"
+
+    - name: Build documentation
+      run: |
+        cd docs
+        uv run sphinx-apidoc -f -o source ../woodgate
+        uv run make html

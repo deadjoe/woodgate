@@ -7,10 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from woodgate.server import (
-    AlertInfo,
-    DocumentContent,
-    ErrorResponse,
-    SearchResult,
     available_products,
     document_types,
     get_alerts,
@@ -113,9 +109,9 @@ class TestServerUnit:
                         # 验证结果
                         assert isinstance(results, list)
                         assert len(results) == 1
-                        assert isinstance(results[0], SearchResult)
-                        assert results[0].title == mock_results[0]["title"]
-                        assert results[0].url == mock_results[0]["url"]
+                        assert "title" in results[0] and "url" in results[0]
+                        assert results[0]["title"] == mock_results[0]["title"]
+                        assert results[0]["url"] == mock_results[0]["url"]
 
     @pytest.mark.asyncio
     async def test_search_login_failure(self):
@@ -141,9 +137,9 @@ class TestServerUnit:
                     # 验证结果 - 结果是一个列表，包含一个错误对象
                     assert isinstance(results, list)
                     assert len(results) == 1
-                    assert isinstance(results[0], ErrorResponse)
-                    assert results[0].error is not None
-                    assert "登录失败" in results[0].error
+                    assert "error" in results[0]
+                    assert results[0]["error"] is not None
+                    assert "登录失败" in results[0]["error"]
 
     @pytest.mark.asyncio
     async def test_search_exception(self):
@@ -170,9 +166,9 @@ class TestServerUnit:
                         # 验证结果
                         assert isinstance(results, list)
                         assert len(results) == 1
-                        assert isinstance(results[0], ErrorResponse)
-                        assert results[0].error is not None
-                        assert "测试异常" in results[0].error
+                        assert "error" in results[0]
+                        assert results[0]["error"] is not None
+                        assert "测试异常" in results[0]["error"]
 
     @pytest.mark.asyncio
     async def test_search_browser_close_exception(self):
@@ -210,8 +206,8 @@ class TestServerUnit:
                                 # 验证结果
                                 assert isinstance(results, list)
                                 assert len(results) == 1
-                                assert isinstance(results[0], SearchResult)
-                                assert results[0].title == "测试结果"
+                                assert "title" in results[0]
+                                assert results[0]["title"] == "测试结果"
 
                                 # 验证日志调用 - 使用assert_called而不是assert_called_once
                                 assert mock_logger.warning.called
@@ -245,9 +241,9 @@ class TestServerUnit:
                         # 验证结果
                         assert isinstance(alerts, list)
                         assert len(alerts) == 1
-                        assert isinstance(alerts[0], AlertInfo)
-                        assert alerts[0].title == mock_alerts[0]["title"]
-                        assert alerts[0].severity == mock_alerts[0]["severity"]
+                        assert "title" in alerts[0] and "severity" in alerts[0]
+                        assert alerts[0]["title"] == mock_alerts[0]["title"]
+                        assert alerts[0]["severity"] == mock_alerts[0]["severity"]
 
     @pytest.mark.asyncio
     async def test_get_alerts_login_failure(self):
@@ -273,9 +269,9 @@ class TestServerUnit:
                     # 验证结果
                     assert isinstance(result, list)
                     assert len(result) == 1
-                    assert isinstance(result[0], ErrorResponse)
-                    assert result[0].error is not None
-                    assert "登录失败" in result[0].error
+                    assert "error" in result[0]
+                    assert result[0]["error"] is not None
+                    assert "登录失败" in result[0]["error"]
 
     @pytest.mark.asyncio
     async def test_get_alerts_exception(self):
@@ -304,9 +300,9 @@ class TestServerUnit:
                         # 验证结果
                         assert isinstance(result, list)
                         assert len(result) == 1
-                        assert isinstance(result[0], ErrorResponse)
-                        assert result[0].error is not None
-                        assert "测试警报异常" in result[0].error
+                        assert "error" in result[0]
+                        assert result[0]["error"] is not None
+                        assert "测试警报异常" in result[0]["error"]
 
     @pytest.mark.asyncio
     async def test_get_alerts_browser_close_exception(self):
@@ -344,8 +340,8 @@ class TestServerUnit:
                                 # 验证结果
                                 assert isinstance(result, list)
                                 assert len(result) == 1
-                                assert isinstance(result[0], AlertInfo)
-                                assert result[0].title == "测试警报"
+                                assert "title" in result[0]
+                                assert result[0]["title"] == "测试警报"
 
                                 # 验证日志调用
                                 assert mock_logger.warning.called
@@ -377,9 +373,9 @@ class TestServerUnit:
                         document = await get_document("https://example.com/doc")
 
                         # 验证结果
-                        assert isinstance(document, DocumentContent)
-                        assert document.title == mock_document["title"]
-                        assert document.content == mock_document["content"]
+                        assert "title" in document and "content" in document
+                        assert document["title"] == mock_document["title"]
+                        assert document["content"] == mock_document["content"]
 
     @pytest.mark.asyncio
     async def test_get_document_login_failure(self):
@@ -403,9 +399,9 @@ class TestServerUnit:
                     result = await get_document("https://example.com/doc")
 
                     # 验证结果
-                    assert isinstance(result, ErrorResponse)
-                    assert result.error is not None
-                    assert "登录失败" in result.error
+                    assert "error" in result
+                    assert result["error"] is not None
+                    assert "登录失败" in result["error"]
 
     @pytest.mark.asyncio
     async def test_get_document_exception(self):
@@ -433,9 +429,9 @@ class TestServerUnit:
                         result = await get_document("https://example.com/doc")
 
                         # 验证结果
-                        assert isinstance(result, ErrorResponse)
-                        assert result.error is not None
-                        assert "测试文档异常" in result.error
+                        assert "error" in result
+                        assert result["error"] is not None
+                        assert "测试文档异常" in result["error"]
 
     @pytest.mark.asyncio
     async def test_get_document_browser_close_exception(self):
@@ -471,8 +467,8 @@ class TestServerUnit:
                                 result = await get_document("https://example.com/doc")
 
                                 # 验证结果
-                                assert isinstance(result, DocumentContent)
-                                assert result.title == "测试文档"
+                                assert "title" in result
+                                assert result["title"] == "测试文档"
 
                                 # 验证日志调用
                                 assert mock_logger.warning.called

@@ -59,6 +59,15 @@ def main():
         mcp.settings.port = port
         mcp.settings.log_level = log_level
 
+        # 添加请求日志
+        logger = logging.getLogger(__name__)
+        logger.info("MCP服务器已准备好接收请求")
+        print("MCP服务器已准备好接收请求")
+
+        # 修改日志级别，确保所有请求都被记录
+        logging.getLogger("uvicorn").setLevel(logging.DEBUG)
+        logging.getLogger("uvicorn.access").setLevel(logging.DEBUG)
+
         # 使用FastMCP的run方法启动服务器
         print(f"启动Woodgate MCP服务器 (transport=sse, host={host}, port={port})...")
         mcp.run(transport="sse")

@@ -116,33 +116,67 @@ uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 
 ### 与Claude Desktop集成
 
-安装到Claude Desktop:
+#### 启动MCP服务器
+
+首先，需要启动MCP服务器：
 
 ```bash
-# 安装MCP服务器到Claude Desktop（凭据已内置）
-/path/to/venv/bin/mcp install server.py:mcp --name "Red Hat KB Search"
-```
-
-如果您使用的是项目的虚拟环境，命令应该是:
-
-```bash
-.venv/bin/mcp install server.py:mcp --name "Red Hat KB Search"
-```
-
-要启动带有调试日志的开发服务器:
-
-```bash
-export PYTHONUNBUFFERED=1
-export LOGLEVEL=DEBUG
-.venv/bin/mcp dev server.py:mcp
-```
-
-注意：系统已内置默认凭据，无需设置环境变量。如果需要使用不同的凭据，可以设置环境变量：
-
-```bash
+# 设置Red Hat客户门户凭据
 export REDHAT_USERNAME="your_username"
 export REDHAT_PASSWORD="your_password"
+
+# 启动MCP服务器
+uv run python -m woodgate --host 0.0.0.0 --port 8080 --log-level DEBUG
 ```
+
+服务器将在端口8080上启动，并使用SSE传输协议。
+
+#### 安装到Claude Desktop
+
+在Claude Desktop中安装MCP服务器：
+
+1. 打开Claude Desktop
+2. 点击菜单栏中的Claude图标
+3. 选择"Settings..."
+4. 在左侧边栏选择"Developer"
+5. 点击"Edit Config"
+
+这将打开配置文件（通常位于`~/Library/Application Support/Claude/claude_desktop_config.json`）。将以下内容添加到配置文件中：
+
+```json
+{
+  "globalShortcut": "",
+  "mcpServers": {
+    "Red Hat KB Search": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--with",
+        "mcp[cli]",
+        "mcp",
+        "run",
+        "/path/to/your/project/server.py:mcp"
+      ],
+      "env": {
+        "REDHAT_USERNAME": "your_username",
+        "REDHAT_PASSWORD": "your_password"
+      }
+    }
+  }
+}
+```
+
+请确保将`/path/to/your/project/`替换为您项目的实际路径。
+
+保存配置文件后，重启Claude Desktop。现在，您应该能够在Claude Desktop中使用Red Hat KB Search工具了。
+
+#### 注意事项
+
+- MCP服务器使用默认端口8000，无需在Claude Desktop配置中指定端口
+- 如果您在启动服务器时指定了不同的端口（如8080），请确保服务器正在运行
+- 凭据可以通过环境变量传递，也可以在配置文件的`env`部分设置
+- 如果您使用`redhat_credentials.txt`文件存储凭据，服务器会自动读取该文件
+- 确保凭据信息不被提交到公共代码仓库
 
 ### MCP工具使用示例
 
@@ -193,11 +227,14 @@ document_types = mcp.resources["config://doc-types"]
 
 ## 安全说明
 
-- 系统已内置默认凭据，可直接使用
-- 如需使用不同凭据，可通过环境变量覆盖：`REDHAT_USERNAME` 和 `REDHAT_PASSWORD`
+- 系统支持多种凭据管理方式：
+  1. 环境变量：`REDHAT_USERNAME` 和 `REDHAT_PASSWORD`
+  2. 配置文件：`redhat_credentials.txt`（包含两行，第一行是用户名，第二行是密码）
+  3. Claude Desktop配置：在`claude_desktop_config.json`的`env`部分设置
+- 凭据优先级：环境变量 > 配置文件 > 默认值
 - 在生产环境中，建议使用环境变量或配置文件管理凭据
-- 确保凭据信息不被提交到公共代码仓库
-- 凭据存储在服务器端，不需要在Claude Desktop端配置
+- 确保凭据信息不被提交到公共代码仓库（已在`.gitignore`中排除）
+- 凭据存储在服务器端，可以通过Claude Desktop配置传递
 
 ## 开发
 

@@ -3,43 +3,52 @@ MCP服务器模块 - 实现Model Context Protocol服务器
 使用Playwright替代Selenium实现更高效的浏览器自动化
 """
 
-import os
-import sys
-import logging
 import asyncio
-import subprocess
 import importlib.util
+import logging
+import os
+import subprocess
+import sys
 import traceback
 import urllib.parse
-from typing import List, Dict, Any, Optional, Tuple, TypedDict, Union
+from typing import Dict, List, Optional, Tuple, TypedDict, Union
+
 
 # 定义结构化类型
 class SearchResult(TypedDict):
     """搜索结果类型"""
+
     title: str
     url: str
-    summary: Optional[str]
-    doc_type: Optional[str]
-    last_updated: Optional[str]
+    summary: str
+    doc_type: str
+    last_updated: str
+
 
 class AlertInfo(TypedDict):
     """警报信息类型"""
+
     title: str
     severity: str
-    url: Optional[str]
-    summary: Optional[str]
-    published_date: Optional[str]
+    url: str
+    summary: str
+    published_date: str
+
 
 class DocumentContent(TypedDict):
     """文档内容类型"""
+
     title: str
     content: str
     url: str
     metadata: Dict[str, str]
 
+
 class ErrorResponse(TypedDict):
     """错误响应类型"""
+
     error: str
+
 
 # 组合类型
 SearchResults = List[Union[SearchResult, ErrorResponse]]
@@ -121,7 +130,7 @@ for package in required_packages:
 # 导入必要的模块
 try:
     from mcp.server.fastmcp import FastMCP
-    from playwright.async_api import async_playwright, Browser, Page, BrowserContext, Playwright
+    from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
 except ImportError as e:
     logger.error(f"导入错误: {e}")
     raise
@@ -226,21 +235,43 @@ def search_params():
 
 # 获取凭据
 def get_credentials():
-    """获取Red Hat客户门户凭据，优先使用环境变量，否则使用固定凭据"""
+    """获取Red Hat客户门户凭据，优先使用环境变量，其次使用credentials文件"""
     logger.debug("获取凭据...")
 
     # 尝试从环境变量获取凭据
     username = os.environ.get("REDHAT_USERNAME")
     password = os.environ.get("REDHAT_PASSWORD")
 
-    # 如果环境变量未设置，使用固定凭据
+    # 如果环境变量未设置，尝试从credentials文件读取
     if not username or not password:
-        # 固定凭据，用于生产环境
-        username = ""
-        password = ""
-        logger.info("使用固定凭据")
+        try:
+            # 尝试读取credentials文件
+            creds_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "redhat_credentials.txt"
+            )
+            logger.debug(f"尝试从文件读取凭据: {creds_path}")
+
+            if os.path.exists(creds_path):
+                with open(creds_path, "r") as f:
+                    lines = f.readlines()
+                    if len(lines) >= 2:
+                        username = lines[0].strip()
+                        password = lines[1].strip()
+                        logger.info(f"使用credentials文件中的凭据: username='{username}'")
+                    else:
+                        logger.warning("credentials文件格式不正确，应包含至少两行")
+            else:
+                logger.warning(f"credentials文件不存在: {creds_path}")
+        except Exception as e:
+            logger.error(f"读取credentials文件出错: {e}")
+            logger.error(f"错误堆栈: {traceback.format_exc()}")
     else:
-        logger.info("使用环境变量中的凭据")
+        logger.info(f"使用环境变量中的凭据: username='{username}'")
+
+    # 检查凭据是否有效
+    if not username or not password:
+        logger.error("未找到有效的凭据")
+        return "", ""
 
     logger.debug(f"凭据获取成功: username='{username}'")
     return username, password
@@ -544,6 +575,15 @@ async def login_to_redhat_portal(
     """
     logger.info("=== 开始登录到Red Hat客户门户 ===")
     logger.info(f"使用凭据: username='{username}'")
+
+    # 添加更详细的日志
+    if not username or not password:
+        logger.error("凭据为空，无法登录")
+        print("凭据为空，无法登录")
+        return False
+
+    logger.info(f"凭据长度检查: username长度={len(username)}, password长度={len(password)}")
+    print(f"凭据长度检查: username长度={len(username)}, password长度={len(password)}")
 
     try:
         # 直接访问登录页面
@@ -919,7 +959,7 @@ async def perform_search(
     page_num: int = 1,
     rows: int = 20,
     sort_by: str = "relevant",
-) -> List[Dict[str, Any]]:
+) -> SearchResults:
     """
     在Red Hat客户门户执行搜索
 
@@ -1106,7 +1146,24 @@ async def perform_search(
                                 logger.debug(
                                     f"通过选择器 {selector} 提取找到 {len(results)} 个结果"
                                 )
-                                return results
+                                # 确保返回类型正确
+                                selector_results: SearchResults = []
+                                for result in results:
+                                    if isinstance(result, dict):
+                                        # 将字典转换为 SearchResult
+                                        selector_results.append(
+                                            SearchResult(
+                                                title=result.get("title", "未知标题"),
+                                                url=result.get("url", ""),
+                                                summary=result.get("summary", "无摘要"),
+                                                doc_type=result.get("doc_type", "未知类型"),
+                                                last_updated=result.get("last_updated", "未知日期"),
+                                            )
+                                        )
+                                    else:
+                                        # 已经是 SearchResult 类型
+                                        selector_results.append(result)
+                                return selector_results
                     except Exception:
                         continue
 
@@ -1177,7 +1234,24 @@ async def perform_search(
 
                         if results:
                             logger.debug(f"通过搜索结果容器提取找到 {len(results)} 个结果")
-                            return results
+                            # 确保返回类型正确
+                            container_results: SearchResults = []
+                            for result in results:
+                                if isinstance(result, dict):
+                                    # 将字典转换为 SearchResult
+                                    container_results.append(
+                                        SearchResult(
+                                            title=result.get("title", "未知标题"),
+                                            url=result.get("url", ""),
+                                            summary=result.get("summary", "无摘要"),
+                                            doc_type=result.get("doc_type", "未知类型"),
+                                            last_updated=result.get("last_updated", "未知日期"),
+                                        )
+                                    )
+                                else:
+                                    # 已经是 SearchResult 类型
+                                    container_results.append(result)
+                            return container_results
 
                     # 如果没有找到搜索结果容器，尝试提取所有链接
                     links = await page.query_selector_all(
@@ -1220,6 +1294,7 @@ async def perform_search(
                                             ]
                                         )
                                     ):
+                                        # 创建一个字典而不是 SearchResult
                                         results.append(
                                             {
                                                 "title": title.strip(),
@@ -1234,7 +1309,24 @@ async def perform_search(
 
                         if results:
                             logger.debug(f"通过链接提取找到 {len(results)} 个结果")
-                            return results
+                            # 确保返回类型正确
+                            link_results: SearchResults = []
+                            for result in results:
+                                if isinstance(result, dict):
+                                    # 将字典转换为 SearchResult
+                                    link_results.append(
+                                        SearchResult(
+                                            title=result.get("title", "未知标题"),
+                                            url=result.get("url", ""),
+                                            summary=result.get("summary", "无摘要"),
+                                            doc_type=result.get("doc_type", "未知类型"),
+                                            last_updated=result.get("last_updated", "未知日期"),
+                                        )
+                                    )
+                                else:
+                                    # 已经是 SearchResult 类型
+                                    link_results.append(result)
+                            return link_results
                 except Exception as e:
                     logger.warning(f"尝试提取链接时出错: {e}")
 
@@ -1293,6 +1385,7 @@ async def perform_search(
                     date_text = await date_element.text_content()
                     last_updated = date_text.strip() if date_text else "未知日期"
 
+                # 创建一个字典而不是 SearchResult
                 results.append(
                     {
                         "title": title,
@@ -1308,15 +1401,32 @@ async def perform_search(
                 continue
 
         logger.debug(f"成功提取 {len(results)} 个搜索结果")
-        return results
+        # 确保返回类型正确
+        typed_results: SearchResults = []
+        for result in results:
+            if isinstance(result, dict):
+                # 将字典转换为 SearchResult
+                typed_results.append(
+                    SearchResult(
+                        title=result.get("title", "未知标题"),
+                        url=result.get("url", ""),
+                        summary=result.get("summary", "无摘要"),
+                        doc_type=result.get("doc_type", "未知类型"),
+                        last_updated=result.get("last_updated", "未知日期"),
+                    )
+                )
+            else:
+                # 已经是 SearchResult 类型
+                typed_results.append(result)
+        return typed_results
     except Exception as e:
         logger.error(f"执行搜索时出错: {e}")
         logger.debug(f"错误堆栈: {traceback.format_exc()}")
-        return []
+        return [ErrorResponse(error="执行搜索时出错")]
 
 
 # 获取产品警报
-async def get_product_alerts(page: Page, product: str) -> List[Dict[str, Any]]:
+async def get_product_alerts(page: Page, product: str) -> AlertResults:
     """
     获取特定产品的警报信息
 
@@ -1391,6 +1501,7 @@ async def get_product_alerts(page: Page, product: str) -> List[Dict[str, Any]]:
                     date_text = await date_element.text_content()
                     published_date = date_text.strip() if date_text else "未知日期"
 
+                # 创建一个字典而不是 AlertInfo
                 alerts.append(
                     {
                         "title": title,
@@ -1406,15 +1517,32 @@ async def get_product_alerts(page: Page, product: str) -> List[Dict[str, Any]]:
                 continue
 
         logger.debug(f"成功提取 {len(alerts)} 个警报")
-        return alerts
+        # 确保返回类型正确
+        typed_alerts: AlertResults = []
+        for alert in alerts:
+            if isinstance(alert, dict):
+                # 将字典转换为 AlertInfo
+                typed_alerts.append(
+                    AlertInfo(
+                        title=alert.get("title", "未知标题"),
+                        url=alert.get("url", ""),
+                        summary=alert.get("summary", "无摘要"),
+                        severity=alert.get("severity", "未知严重性"),
+                        published_date=alert.get("published_date", "未知日期"),
+                    )
+                )
+            else:
+                # 已经是 AlertInfo 类型
+                typed_alerts.append(alert)
+        return typed_alerts
     except Exception as e:
         logger.error(f"获取产品警报时出错: {e}")
         logger.debug(f"错误堆栈: {traceback.format_exc()}")
-        return []
+        return [ErrorResponse(error="获取产品警报时出错")]
 
 
 # 获取文档内容
-async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
+async def get_document_content(page: Page, document_url: str) -> DocumentResult:
     """
     获取特定文档的详细内容
 
@@ -1484,11 +1612,12 @@ async def get_document_content(page: Page, document_url: str) -> Dict[str, Any]:
         except Exception as e:
             logger.warning(f"提取文档元数据时出错: {e}")
 
+        # 创建一个字典而不是 DocumentContent
         return {"title": title, "url": document_url, "content": content, "metadata": metadata}
     except Exception as e:
         logger.error(f"获取文档内容时出错: {e}")
         logger.debug(f"错误堆栈: {traceback.format_exc()}")
-        return {"title": "错误", "url": document_url, "content": f"获取文档内容时出错: {str(e)}"}
+        return {"error": f"获取文档内容时出错: {str(e)}"}
 
 
 # 可用产品列表
@@ -1790,13 +1919,15 @@ async def get_document(document_url: str) -> DocumentResult:
 @mcp.resource("redhat://products")
 def get_available_products_resource() -> List[str]:
     """获取可用的产品列表"""
-    return get_available_products()
+    products: List[str] = available_products()
+    return products
 
 
 @mcp.resource("redhat://doc-types")
 def get_document_types_resource() -> List[str]:
     """获取可用的文档类型"""
-    return get_document_types()
+    doc_types: List[str] = document_types()
+    return doc_types
 
 
 @mcp.prompt()
@@ -1867,3 +1998,10 @@ def search_example() -> str:
     get_document(document_url="https://access.redhat.com/solutions/12345")
     ```
     """
+
+
+# 如果直接运行此文件，启动MCP服务器
+if __name__ == "__main__":
+    print("启动Red Hat KB Search MCP服务器...")
+    # 使用默认端口8000启动服务器
+    mcp.run(transport="sse", host="0.0.0.0", port=8000)

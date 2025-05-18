@@ -3,86 +3,70 @@ MCP服务器模块 - 实现Model Context Protocol服务器
 """
 
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, TypedDict, Union
+
+from typing_extensions import NotRequired
 
 from .config import get_available_products, get_credentials, get_document_types
 from .core.auth import login_to_redhat_portal
 from .core.browser import initialize_browser
 from .core.search import get_document_content, get_product_alerts, perform_search
 
-# 由于 MCP 导入问题，使用模拟的 MCP 类
+# 导入 FastMCP 类
 try:
-    from mcp import MCP  # type: ignore
-except ImportError:
-    from .mcp_mock import MCP
+    from mcp.server.fastmcp import FastMCP
+except ImportError as e:
+    logging.error(f"导入 FastMCP 失败: {e}")
+    raise
 
 logger = logging.getLogger(__name__)
-mcp = MCP()
+# 创建 FastMCP 实例
+mcp = FastMCP(
+    name="Woodgate",
+    description="Red Hat客户门户搜索工具，提供登录、搜索和文档获取功能。",
+    version="1.0.0",  # 添加版本号
+    log_level="DEBUG",  # 设置日志级别为DEBUG
+    dependencies=["playwright", "httpx"],  # 声明依赖
+    stateless_http=True,  # 支持无状态HTTP传输
+)
 
 
-class SearchResult:
+class SearchResult(TypedDict):
     """搜索结果类型"""
 
-    def __init__(
-        self,
-        title: str,
-        url: str,
-        description: Optional[str] = None,
-        doc_type: Optional[str] = None,
-        last_modified: Optional[str] = None,
-        score: Optional[float] = None,
-    ):
-        self.title = title
-        self.url = url
-        self.description = description
-        self.doc_type = doc_type
-        self.last_modified = last_modified
-        self.score = score
+    title: str
+    url: str
+    description: NotRequired[str]
+    doc_type: NotRequired[str]
+    last_modified: NotRequired[str]
+    score: NotRequired[float]
 
 
-class AlertInfo:
+class AlertInfo(TypedDict):
     """警报信息类型"""
 
-    def __init__(
-        self,
-        title: str,
-        severity: str,
-        issued: Optional[str] = None,
-        cve: Optional[str] = None,
-        url: Optional[str] = None,
-        description: Optional[str] = None,
-    ):
-        self.title = title
-        self.severity = severity
-        self.issued = issued
-        self.cve = cve
-        self.url = url
-        self.description = description
+    title: str
+    severity: str
+    issued: NotRequired[str]
+    cve: NotRequired[str]
+    url: NotRequired[str]
+    description: NotRequired[str]
 
 
-class DocumentContent:
+class DocumentContent(TypedDict):
     """文档内容类型"""
 
-    def __init__(
-        self,
-        title: str,
-        content: str,
-        url: str,
-        doc_type: Optional[str] = None,
-        last_modified: Optional[str] = None,
-    ):
-        self.title = title
-        self.content = content
-        self.url = url
-        self.doc_type = doc_type
-        self.last_modified = last_modified
+    title: str
+    content: str
+    url: str
+    doc_type: NotRequired[str]
+    last_modified: NotRequired[str]
 
 
-class ErrorResponse:
+class ErrorResponse(TypedDict):
     """错误响应类型"""
 
-    def __init__(self, error: str):
-        self.error = error
+    error: str
 
 
 # 组合类型
@@ -114,7 +98,9 @@ async def search(
     Returns:
         搜索结果列表
     """
-    logger.info(f"执行搜索: '{query}'")
+    logger.info(f"收到MCP搜索请求: query='{query}', products={products}, doc_types={doc_types}")
+    print(f"收到MCP搜索请求: query='{query}', products={products}, doc_types={doc_types}")
+    print(f"页码={page_num}, 每页结果数={rows}, 排序方式={sort_by}")
 
     browser_resources = None
     try:
@@ -136,7 +122,7 @@ async def search(
         # 检查浏览器初始化是否成功
         if page is None:
             logger.error("浏览器初始化失败")
-            return [ErrorResponse(error="浏览器初始化失败，无法执行搜索")]
+            return [{"error": "浏览器初始化失败，无法执行搜索"}]
 
         # 执行登录
         login_success = await login_to_redhat_portal(page, context, username, password)
@@ -157,16 +143,16 @@ async def search(
         search_results: List[Union[SearchResult, ErrorResponse]] = []
         for result in results:
             if "error" in result:
-                search_results.append(ErrorResponse(error=result["error"]))
+                search_results.append({"error": result["error"]})
             else:
                 search_results.append(
-                    SearchResult(
-                        title=result.get("title", "未知标题"),
-                        url=result.get("url", ""),
-                        description=result.get("summary", ""),
-                        doc_type=result.get("doc_type", ""),
-                        last_modified=result.get("last_updated", ""),
-                    )
+                    {
+                        "title": result.get("title", "未知标题"),
+                        "url": result.get("url", ""),
+                        "description": result.get("summary", ""),
+                        "doc_type": result.get("doc_type", ""),
+                        "last_modified": result.get("last_updated", ""),
+                    }
                 )
         return search_results
     except Exception as e:
@@ -174,7 +160,7 @@ async def search(
         import traceback
 
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return [ErrorResponse(error=f"搜索过程中出错: {str(e)}")]
+        return [{"error": f"搜索过程中出错: {str(e)}"}]
     finally:
         try:
             # 安全地关闭浏览器
@@ -198,7 +184,8 @@ async def get_alerts(product: str) -> AlertResults:
     Returns:
         警报信息列表
     """
-    logger.info(f"获取产品警报: '{product}'")
+    logger.info(f"收到MCP获取警报请求: product='{product}'")
+    print(f"收到MCP获取警报请求: product='{product}'")
 
     browser_resources = None
     try:
@@ -220,12 +207,12 @@ async def get_alerts(product: str) -> AlertResults:
         # 检查浏览器初始化是否成功
         if page is None:
             logger.error("浏览器初始化失败")
-            return [ErrorResponse(error="浏览器初始化失败，无法获取警报")]
+            return [{"error": "浏览器初始化失败，无法获取警报"}]
 
         # 执行登录
         login_success = await login_to_redhat_portal(page, context, username, password)
         if not login_success:
-            return [ErrorResponse(error="登录失败，请检查凭据")]
+            return [{"error": "登录失败，请检查凭据"}]
 
         # 获取产品警报
         alerts_data = await get_product_alerts(page, product)
@@ -233,17 +220,17 @@ async def get_alerts(product: str) -> AlertResults:
         alert_results: List[Union[AlertInfo, ErrorResponse]] = []
         for alert in alerts_data:
             if "error" in alert:
-                alert_results.append(ErrorResponse(error=alert["error"]))
+                alert_results.append({"error": alert["error"]})
             else:
                 alert_results.append(
-                    AlertInfo(
-                        title=alert.get("title", "未知警报"),
-                        severity=alert.get("severity", "未知"),
-                        issued=alert.get("issued", ""),
-                        cve=alert.get("cve", ""),
-                        url=alert.get("url", ""),
-                        description=alert.get("description", ""),
-                    )
+                    {
+                        "title": alert.get("title", "未知警报"),
+                        "severity": alert.get("severity", "未知"),
+                        "issued": alert.get("issued", ""),
+                        "cve": alert.get("cve", ""),
+                        "url": alert.get("url", ""),
+                        "description": alert.get("description", ""),
+                    }
                 )
         return alert_results
     except Exception as e:
@@ -251,7 +238,7 @@ async def get_alerts(product: str) -> AlertResults:
         import traceback
 
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return [ErrorResponse(error=f"获取警报过程中出错: {str(e)}")]
+        return [{"error": f"获取警报过程中出错: {str(e)}"}]
     finally:
         try:
             # 安全地关闭浏览器
@@ -275,7 +262,8 @@ async def get_document(document_url: str) -> DocumentResult:
     Returns:
         文档内容
     """
-    logger.info(f"获取文档内容: {document_url}")
+    logger.info(f"收到MCP获取文档请求: document_url='{document_url}'")
+    print(f"收到MCP获取文档请求: document_url='{document_url}'")
 
     browser_resources = None
     try:
@@ -297,32 +285,32 @@ async def get_document(document_url: str) -> DocumentResult:
         # 检查浏览器初始化是否成功
         if page is None:
             logger.error("浏览器初始化失败")
-            return ErrorResponse(error="浏览器初始化失败，无法获取文档内容")
+            return {"error": "浏览器初始化失败，无法获取文档内容"}
 
         # 执行登录
         login_success = await login_to_redhat_portal(page, context, username, password)
         if not login_success:
-            return ErrorResponse(error="登录失败，请检查凭据")
+            return {"error": "登录失败，请检查凭据"}
 
         # 获取文档内容
         document_data = await get_document_content(page, document_url)
         # 将结果转换为DocumentContent对象
         if "error" in document_data:
-            return ErrorResponse(error=document_data["error"])
+            return {"error": document_data["error"]}
 
-        return DocumentContent(
-            title=document_data.get("title", "未知标题"),
-            content=document_data.get("content", ""),
-            url=document_url,
-            doc_type=document_data.get("metadata", {}).get("Document Type", ""),
-            last_modified=document_data.get("metadata", {}).get("Last Modified", ""),
-        )
+        return {
+            "title": document_data.get("title", "未知标题"),
+            "content": document_data.get("content", ""),
+            "url": document_url,
+            "doc_type": document_data.get("metadata", {}).get("Document Type", ""),
+            "last_modified": document_data.get("metadata", {}).get("Last Modified", ""),
+        }
     except Exception as e:
         logger.error(f"获取文档内容过程中出错: {e}")
         import traceback
 
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return ErrorResponse(error=f"获取文档内容过程中出错: {str(e)}")
+        return {"error": f"获取文档内容过程中出错: {str(e)}"}
     finally:
         try:
             # 安全地关闭浏览器

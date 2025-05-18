@@ -2,14 +2,12 @@
 认证模块测试 - 包含基本测试、扩展测试和单元测试
 """
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from playwright.async_api import TimeoutError
 
 from woodgate.core.auth import check_login_status, login_to_redhat_portal
-from tests.test_async_helpers import wrap_async_mock
 
 
 class TestAuthBasic:
@@ -37,32 +35,24 @@ class TestAuthBasic:
 
         # 设置 evaluate 返回值
         mock_page.evaluate = AsyncMock(
-            side_effect=[
-                True,  # 页面准备好的检查
-                {"success": True}  # JavaScript登录成功
-            ]
+            side_effect=[True, {"success": True}]  # 页面准备好的检查  # JavaScript登录成功
         )
 
-        with patch(
-            "woodgate.core.utils.handle_cookie_popup", return_value=True
-        ) as mock_handle_cookie:
-            with patch("woodgate.core.auth.print_cookies") as mock_print_cookies:
-                # 调用被测试的函数
-                result = await login_to_redhat_portal(
-                    mock_page, mock_context, "test_user", "test_pass"
-                )
+        with patch("woodgate.core.utils.handle_cookie_popup", return_value=True):
+            # 调用被测试的函数
+            result = await login_to_redhat_portal(mock_page, mock_context, "test_user", "test_pass")
 
-                # 验证结果
-                assert result is True
-                mock_page.goto.assert_called_once_with(
-                    "https://access.redhat.com/login", wait_until="networkidle", timeout=30000
-                )
-                # 不再验证fill和click方法，因为现在使用JavaScript填充表单
-                # 而不是使用Playwright的fill和click方法
-                # 注意：在当前实现中，cookie横幅处理由browser.py中的setup_cookie_banner_handlers函数处理
-                # 所以这里不再验证handle_cookie_popup是否被调用
-                # 注意：print_cookies只在登录成功后被调用，但在测试中可能不会被调用
-                # 所以这里不再验证print_cookies是否被调用
+            # 验证结果
+            assert result is True
+            mock_page.goto.assert_called_once_with(
+                "https://access.redhat.com/login", wait_until="networkidle", timeout=30000
+            )
+            # 不再验证fill和click方法，因为现在使用JavaScript填充表单
+            # 而不是使用Playwright的fill和click方法
+            # 注意：在当前实现中，cookie横幅处理由browser.py中的setup_cookie_banner_handlers函数处理
+            # 所以这里不再验证handle_cookie_popup是否被调用
+            # 注意：print_cookies只在登录成功后被调用，但在测试中可能不会被调用
+            # 所以这里不再验证print_cookies是否被调用
 
     @pytest.mark.asyncio
     async def test_login_to_redhat_portal_failure(self):
@@ -91,9 +81,7 @@ class TestAuthBasic:
         with patch("woodgate.core.utils.handle_cookie_popup", return_value=True):
             with patch("woodgate.core.auth.asyncio.sleep"):
                 # 调用被测试的函数
-                result = await login_to_redhat_portal(
-                    mock_page, mock_context, "test_user", "test_pass"
-                )
+                await login_to_redhat_portal(mock_page, mock_context, "test_user", "test_pass")
 
                 # 验证结果
                 # 注意：在当前实现中，如果URL不包含login，会认为登录成功
@@ -210,10 +198,7 @@ class TestAuthExtended:
         # 设置模拟行为
         mock_page.goto = AsyncMock()
         mock_page.evaluate = AsyncMock(
-            side_effect=[
-                True,  # 页面准备好的检查
-                {"success": True}  # JavaScript登录成功
-            ]
+            side_effect=[True, {"success": True}]  # 页面准备好的检查  # JavaScript登录成功
         )
 
         # 设置wait_for_load_state抛出异常
@@ -228,9 +213,7 @@ class TestAuthExtended:
 
         # 调用被测试函数
         with patch("woodgate.core.auth.log_step"):  # 忽略日志步骤
-            result = await login_to_redhat_portal(
-                mock_page, mock_context, "test_user", "test_pass"
-            )
+            result = await login_to_redhat_portal(mock_page, mock_context, "test_user", "test_pass")
 
         # 验证结果 - 应该成功，因为已经离开登录页面
         assert result is True
@@ -268,7 +251,7 @@ class TestAuthUnit:
         with patch("woodgate.core.auth.log_step"):  # 忽略日志步骤
             with patch("woodgate.core.auth.asyncio.sleep"):  # 忽略sleep
                 with patch("woodgate.core.auth.logger"):  # 忽略日志
-                    result = await login_to_redhat_portal(
+                    await login_to_redhat_portal(
                         mock_page, mock_context, "test_user", "test_pass", max_retries=2
                     )
 
@@ -292,10 +275,7 @@ class TestAuthUnit:
 
         # 设置evaluate返回
         mock_page.evaluate = AsyncMock(
-            side_effect=[
-                True,  # 页面准备好的检查
-                {"success": False}  # JavaScript登录失败
-            ]
+            side_effect=[True, {"success": False}]  # 页面准备好的检查  # JavaScript登录失败
         )
 
         # 设置错误消息
@@ -325,7 +305,7 @@ class TestAuthUnit:
         mock_page.evaluate = AsyncMock(
             side_effect=[
                 True,  # 页面准备好的检查
-                {"success": False, "error": "未找到用户名输入框"}
+                {"success": False, "error": "未找到用户名输入框"},
             ]
         )
 
@@ -373,16 +353,12 @@ class TestAuthUnit:
 
         # 测试空用户名
         with patch("woodgate.core.auth.log_step"):  # 忽略日志步骤
-            result = await login_to_redhat_portal(
-                mock_page, mock_context, "", "test_pass"
-            )
+            result = await login_to_redhat_portal(mock_page, mock_context, "", "test_pass")
         assert result is False
 
         # 测试空密码
         with patch("woodgate.core.auth.log_step"):  # 忽略日志步骤
-            result = await login_to_redhat_portal(
-                mock_page, mock_context, "test_user", ""
-            )
+            result = await login_to_redhat_portal(mock_page, mock_context, "test_user", "")
         assert result is False
 
         # 测试负数重试次数

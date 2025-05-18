@@ -7,15 +7,12 @@ import os
 from typing import Any, Dict, Generator
 
 import pytest
-from playwright.sync_api import BrowserContext, Page
 
 # 导入异步API
-from playwright.async_api import (
-    async_playwright,
-    Browser as AsyncBrowser,
-    BrowserContext as AsyncBrowserContext,
-    Page as AsyncPage,
-)
+from playwright.async_api import Browser as AsyncBrowser
+from playwright.async_api import BrowserContext as AsyncBrowserContext
+from playwright.async_api import async_playwright
+from playwright.sync_api import BrowserContext, Page
 
 
 # 自定义命令行选项

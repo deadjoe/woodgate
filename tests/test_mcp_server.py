@@ -4,7 +4,6 @@ MCP服务器测试
 
 from unittest.mock import patch
 
-import pytest
 from woodgate.server import (
     available_products,
     document_types,

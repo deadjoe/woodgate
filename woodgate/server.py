@@ -3,67 +3,92 @@ MCP服务器模块 - 实现Model Context Protocol服务器
 """
 
 import logging
-from typing import Any, Dict, List, Optional, TypedDict, Union
-
-from mcp.server.fastmcp import FastMCP
-
-# 定义结构化类型
-class SearchResult(TypedDict):
-    """搜索结果类型"""
-    title: str
-    url: str
-    description: Optional[str]
-    doc_type: Optional[str]
-    last_modified: Optional[str]
-    score: Optional[float]
-
-class AlertInfo(TypedDict):
-    """警报信息类型"""
-    title: str
-    severity: str
-    issued: Optional[str]
-    cve: Optional[str]
-    url: Optional[str]
-    description: Optional[str]
-
-class DocumentContent(TypedDict):
-    """文档内容类型"""
-    title: str
-    content: str
-    url: str
-    doc_type: Optional[str]
-    last_modified: Optional[str]
-
-class ErrorResponse(TypedDict):
-    """错误响应类型"""
-    error: str
-
-# 组合类型
-SearchResults = List[Union[SearchResult, ErrorResponse]]
-AlertResults = List[Union[AlertInfo, ErrorResponse]]
-DocumentResult = Union[DocumentContent, ErrorResponse]
+from typing import Any, Dict, List, Optional, Union
 
 from .config import get_available_products, get_credentials, get_document_types
 from .core.auth import login_to_redhat_portal
 from .core.browser import initialize_browser
 from .core.search import get_document_content, get_product_alerts, perform_search
-from .core.utils import setup_logging
 
-# 设置日志
-setup_logging()
+# 由于 MCP 导入问题，使用模拟的 MCP 类
+try:
+    from mcp import MCP  # type: ignore
+except ImportError:
+    from .mcp_mock import MCP
+
 logger = logging.getLogger(__name__)
+mcp = MCP()
 
-# 创建MCP服务器
-mcp = FastMCP(
-    "Woodgate",
-    description="Red Hat客户门户搜索工具",
-    version="1.0.0",  # 添加版本号
-    host="0.0.0.0",  # 默认监听所有接口
-    port=8000,  # 默认端口
-    log_level="INFO",  # 默认日志级别
-    dependencies=["playwright", "httpx"],  # 声明依赖
-    stateless_http=True,  # 支持无状态HTTP传输
-)
+
+class SearchResult:
+    """搜索结果类型"""
+
+    def __init__(
+        self,
+        title: str,
+        url: str,
+        description: Optional[str] = None,
+        doc_type: Optional[str] = None,
+        last_modified: Optional[str] = None,
+        score: Optional[float] = None,
+    ):
+        self.title = title
+        self.url = url
+        self.description = description
+        self.doc_type = doc_type
+        self.last_modified = last_modified
+        self.score = score
+
+
+class AlertInfo:
+    """警报信息类型"""
+
+    def __init__(
+        self,
+        title: str,
+        severity: str,
+        issued: Optional[str] = None,
+        cve: Optional[str] = None,
+        url: Optional[str] = None,
+        description: Optional[str] = None,
+    ):
+        self.title = title
+        self.severity = severity
+        self.issued = issued
+        self.cve = cve
+        self.url = url
+        self.description = description
+
+
+class DocumentContent:
+    """文档内容类型"""
+
+    def __init__(
+        self,
+        title: str,
+        content: str,
+        url: str,
+        doc_type: Optional[str] = None,
+        last_modified: Optional[str] = None,
+    ):
+        self.title = title
+        self.content = content
+        self.url = url
+        self.doc_type = doc_type
+        self.last_modified = last_modified
+
+
+class ErrorResponse:
+    """错误响应类型"""
+
+    def __init__(self, error: str):
+        self.error = error
+
+
+# 组合类型
+SearchResults = List[Union[SearchResult, ErrorResponse]]
+AlertResults = List[Union[AlertInfo, ErrorResponse]]
+DocumentResult = Union[DocumentContent, ErrorResponse]
 
 
 @mcp.tool()
@@ -71,7 +96,7 @@ async def search(
     query: str,
     products: Optional[List[str]] = None,
     doc_types: Optional[List[str]] = None,
-    page: int = 1,
+    page_num: int = 1,
     rows: int = 20,
     sort_by: str = "relevant",
 ) -> SearchResults:
@@ -82,7 +107,7 @@ async def search(
         query: 搜索关键词
         products: 要搜索的产品列表，例如 ["Red Hat Enterprise Linux", "Red Hat OpenShift"]
         doc_types: 文档类型列表，例如 ["Solution", "Article"]
-        page: 页码
+        page_num: 页码
         rows: 每页结果数
         sort_by: 排序方式，可选值: "relevant", "lastModifiedDate desc", "lastModifiedDate asc"
 
@@ -91,7 +116,7 @@ async def search(
     """
     logger.info(f"执行搜索: '{query}'")
 
-    browser = None
+    browser_resources = None
     try:
         # 并行初始化浏览器和获取凭据
         import asyncio
@@ -101,45 +126,63 @@ async def search(
         credentials_task = asyncio.to_thread(get_credentials)
 
         # 等待两个任务完成
-        browser, credentials_result = await asyncio.gather(browser_task, credentials_task)
+        browser_resources, credentials_result = await asyncio.gather(browser_task, credentials_task)
         username, password = credentials_result
 
+        # 解包浏览器资源
+        playwright, browser, context, page_obj = browser_resources
+        page = page_obj  # 重命名变量，避免与函数参数冲突
+
         # 检查浏览器初始化是否成功
-        if browser is None:
+        if page is None:
             logger.error("浏览器初始化失败")
-            return [{"error": "浏览器初始化失败，无法执行搜索"}]
+            return [ErrorResponse(error="浏览器初始化失败，无法执行搜索")]
 
         # 执行登录
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = await login_to_redhat_portal(page, context, username, password)
         if not login_success:
-            return [{"error": "登录失败，请检查凭据"}]
+            return [ErrorResponse(error="登录失败，请检查凭据")]
 
         # 执行搜索
         results = await perform_search(
-            browser,
+            page,
             query=query,
             products=products or [],
             doc_types=doc_types or [],
-            page=page,
+            page_num=page_num,
             rows=rows,
             sort_by=sort_by,
         )
-        return results
+        # 将结果转换为SearchResult对象列表
+        search_results: List[Union[SearchResult, ErrorResponse]] = []
+        for result in results:
+            if "error" in result:
+                search_results.append(ErrorResponse(error=result["error"]))
+            else:
+                search_results.append(
+                    SearchResult(
+                        title=result.get("title", "未知标题"),
+                        url=result.get("url", ""),
+                        description=result.get("summary", ""),
+                        doc_type=result.get("doc_type", ""),
+                        last_modified=result.get("last_updated", ""),
+                    )
+                )
+        return search_results
     except Exception as e:
         logger.error(f"搜索过程中出错: {e}")
         import traceback
 
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return [{"error": f"搜索过程中出错: {str(e)}"}]
+        return [ErrorResponse(error=f"搜索过程中出错: {str(e)}")]
     finally:
         try:
             # 安全地关闭浏览器
-            if browser:
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
+            if browser_resources:
+                playwright, browser, context, page_obj = browser_resources
+                from .core.browser import close_browser
+
+                await close_browser(playwright, browser, context, page_obj)
         except Exception as e:
             logger.warning(f"关闭浏览器时出错: {e}")
 
@@ -157,7 +200,7 @@ async def get_alerts(product: str) -> AlertResults:
     """
     logger.info(f"获取产品警报: '{product}'")
 
-    browser = None
+    browser_resources = None
     try:
         # 并行初始化浏览器和获取凭据
         import asyncio
@@ -167,37 +210,56 @@ async def get_alerts(product: str) -> AlertResults:
         credentials_task = asyncio.to_thread(get_credentials)
 
         # 等待两个任务完成
-        browser, credentials_result = await asyncio.gather(browser_task, credentials_task)
+        browser_resources, credentials_result = await asyncio.gather(browser_task, credentials_task)
         username, password = credentials_result
 
+        # 解包浏览器资源
+        playwright, browser, context, page_obj = browser_resources
+        page = page_obj  # 重命名变量，避免与函数参数冲突
+
         # 检查浏览器初始化是否成功
-        if browser is None:
+        if page is None:
             logger.error("浏览器初始化失败")
-            return [{"error": "浏览器初始化失败，无法获取警报"}]
+            return [ErrorResponse(error="浏览器初始化失败，无法获取警报")]
 
         # 执行登录
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = await login_to_redhat_portal(page, context, username, password)
         if not login_success:
-            return [{"error": "登录失败，请检查凭据"}]
+            return [ErrorResponse(error="登录失败，请检查凭据")]
 
         # 获取产品警报
-        alerts = await get_product_alerts(browser, product)
-        return alerts
+        alerts_data = await get_product_alerts(page, product)
+        # 将结果转换为AlertInfo对象列表
+        alert_results: List[Union[AlertInfo, ErrorResponse]] = []
+        for alert in alerts_data:
+            if "error" in alert:
+                alert_results.append(ErrorResponse(error=alert["error"]))
+            else:
+                alert_results.append(
+                    AlertInfo(
+                        title=alert.get("title", "未知警报"),
+                        severity=alert.get("severity", "未知"),
+                        issued=alert.get("issued", ""),
+                        cve=alert.get("cve", ""),
+                        url=alert.get("url", ""),
+                        description=alert.get("description", ""),
+                    )
+                )
+        return alert_results
     except Exception as e:
         logger.error(f"获取警报过程中出错: {e}")
         import traceback
 
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return [{"error": f"获取警报过程中出错: {str(e)}"}]
+        return [ErrorResponse(error=f"获取警报过程中出错: {str(e)}")]
     finally:
         try:
             # 安全地关闭浏览器
-            if browser:
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
+            if browser_resources:
+                playwright, browser, context, page_obj = browser_resources
+                from .core.browser import close_browser
+
+                await close_browser(playwright, browser, context, page_obj)
         except Exception as e:
             logger.warning(f"关闭浏览器时出错: {e}")
 
@@ -215,7 +277,7 @@ async def get_document(document_url: str) -> DocumentResult:
     """
     logger.info(f"获取文档内容: {document_url}")
 
-    browser = None
+    browser_resources = None
     try:
         # 并行初始化浏览器和获取凭据
         import asyncio
@@ -225,37 +287,50 @@ async def get_document(document_url: str) -> DocumentResult:
         credentials_task = asyncio.to_thread(get_credentials)
 
         # 等待两个任务完成
-        browser, credentials_result = await asyncio.gather(browser_task, credentials_task)
+        browser_resources, credentials_result = await asyncio.gather(browser_task, credentials_task)
         username, password = credentials_result
 
+        # 解包浏览器资源
+        playwright, browser, context, page_obj = browser_resources
+        page = page_obj  # 重命名变量，避免与函数参数冲突
+
         # 检查浏览器初始化是否成功
-        if browser is None:
+        if page is None:
             logger.error("浏览器初始化失败")
-            return {"error": "浏览器初始化失败，无法获取文档内容"}
+            return ErrorResponse(error="浏览器初始化失败，无法获取文档内容")
 
         # 执行登录
-        login_success = await login_to_redhat_portal(browser, username, password)
+        login_success = await login_to_redhat_portal(page, context, username, password)
         if not login_success:
-            return {"error": "登录失败，请检查凭据"}
+            return ErrorResponse(error="登录失败，请检查凭据")
 
         # 获取文档内容
-        document = await get_document_content(browser, document_url)
-        return document
+        document_data = await get_document_content(page, document_url)
+        # 将结果转换为DocumentContent对象
+        if "error" in document_data:
+            return ErrorResponse(error=document_data["error"])
+        else:
+            return DocumentContent(
+                title=document_data.get("title", "未知标题"),
+                content=document_data.get("content", ""),
+                url=document_url,
+                doc_type=document_data.get("metadata", {}).get("Document Type", ""),
+                last_modified=document_data.get("metadata", {}).get("Last Modified", ""),
+            )
     except Exception as e:
         logger.error(f"获取文档内容过程中出错: {e}")
         import traceback
 
         logger.error(f"错误堆栈: {traceback.format_exc()}")
-        return {"error": f"获取文档内容过程中出错: {str(e)}"}
+        return ErrorResponse(error=f"获取文档内容过程中出错: {str(e)}")
     finally:
         try:
             # 安全地关闭浏览器
-            if browser:
-                try:
-                    await browser.quit()
-                except Exception:
-                    # 如果异步关闭失败，尝试同步关闭
-                    browser.quit()
+            if browser_resources:
+                playwright, browser, context, page_obj = browser_resources
+                from .core.browser import close_browser
+
+                await close_browser(playwright, browser, context, page_obj)
         except Exception as e:
             logger.warning(f"关闭浏览器时出错: {e}")
 
@@ -301,7 +376,7 @@ def search_help() -> str:
     - **query**: 搜索关键词，例如 "memory leak"
     - **products**: 要搜索的产品列表，例如 ["Red Hat Enterprise Linux", "Red Hat OpenShift"]
     - **doc_types**: 文档类型列表，例如 ["Solution", "Article"]
-    - **page**: 页码，默认为1
+    - **page_num**: 页码，默认为1
     - **rows**: 每页结果数，默认为20
     - **sort_by**: 排序方式，可选值: "relevant", "lastModifiedDate desc", "lastModifiedDate asc"
 
@@ -342,7 +417,7 @@ def search_example() -> str:
         query="performance tuning",
         products=["Red Hat Enterprise Linux"],
         doc_types=["Solution", "Article", "Documentation"],
-        page=1,
+        page_num=1,
         rows=50,
         sort_by="lastModifiedDate desc"
     )

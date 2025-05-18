@@ -9,7 +9,7 @@ import traceback
 
 from playwright.async_api import BrowserContext, Page
 
-from .utils import log_step, print_cookies
+from .utils import log_step
 
 logger = logging.getLogger(__name__)
 
@@ -189,12 +189,12 @@ async def login_to_redhat_portal(
 
             # 确保返回值是字典类型
             if not isinstance(login_result, dict):
-                login_result = {'success': False, 'error': 'Invalid response format'}
+                login_result = {"success": False, "error": "Invalid response format"}
 
             logger.info(f"JavaScript登录结果: {login_result}")
 
             # 如果JavaScript检测到用户菜单，直接返回成功
-            if login_result.get('user_menu'):
+            if login_result.get("user_menu"):
                 logger.info("JavaScript检测到用户菜单，登录成功")
                 return True
 
@@ -205,7 +205,7 @@ async def login_to_redhat_portal(
                 logger.warning(f"等待页面加载完成时出错: {e}")
 
             # 如果JavaScript登录成功但未检测到用户菜单，继续检查页面状态
-            if login_result.get('success'):
+            if login_result.get("success"):
                 # 检查URL
                 current_url = page.url
                 logger.debug(f"当前URL: {current_url}")
@@ -337,3 +337,6 @@ async def check_login_status(page: Page) -> bool:
         logger.error(f"检查登录状态时出错: {e}")
         logger.debug(f"错误堆栈: {traceback.format_exc()}")
         return False
+
+    # 默认返回值，确保所有路径都有返回值
+    return False

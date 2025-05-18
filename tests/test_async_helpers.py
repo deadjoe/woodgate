@@ -27,7 +27,7 @@ def wrap_async_mock(mock_obj):
         "on",
         "locator",
         "get_by_text",
-        "route"
+        "route",
     ]
 
     # 为特殊方法创建同步版本
@@ -48,6 +48,7 @@ def wrap_async_mock(mock_obj):
 
     # 包装方法
     for name, method in original_methods.items():
+
         async def wrapped_method(*args, _method=method, **kwargs):
             result = _method(*args, **kwargs)
             if asyncio.iscoroutine(result):

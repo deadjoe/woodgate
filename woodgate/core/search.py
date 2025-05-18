@@ -6,7 +6,7 @@
 import asyncio
 import logging
 import traceback
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from playwright.async_api import Error, Page, TimeoutError
 
@@ -22,8 +22,8 @@ ALERTS_BASE_URL = "https://access.redhat.com/security/security-updates/"  # å·²å
 async def perform_search(
     page: Page,
     query: str,
-    products: List[str] = None,
-    doc_types: List[str] = None,
+    products: Optional[List[str]] = None,
+    doc_types: Optional[List[str]] = None,
     page_num: int = 1,
     rows: int = 20,
     sort_by: str = "relevant",
@@ -88,8 +88,8 @@ async def perform_search(
 
 def build_search_url(
     query: str,
-    products: List[str] = None,
-    doc_types: List[str] = None,
+    products: Optional[List[str]] = None,
+    doc_types: Optional[List[str]] = None,
     page: int = 1,
     rows: int = 20,
     sort_by: str = "relevant",

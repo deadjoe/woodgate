@@ -2,18 +2,12 @@
 浏览器模块测试 - 包含基本测试、扩展测试和单元测试
 """
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from playwright.async_api import Browser, BrowserContext, Page, Playwright
 
-from woodgate.core.browser import (
-    close_browser,
-    initialize_browser,
-    setup_cookie_banner_handlers,
-)
-from tests.test_async_helpers import wrap_async_mock
+from woodgate.core.browser import close_browser, initialize_browser, setup_cookie_banner_handlers
 
 
 class TestBrowserBasic:
@@ -304,7 +298,7 @@ class TestBrowserUnit:
         # 验证cookie内容
         cookies = mock_context.add_cookies.call_args[0][0]
         assert len(cookies) >= 1
-        assert any(cookie['name'] == 'redhat_cookie_notice_accepted' for cookie in cookies)
+        assert any(cookie["name"] == "redhat_cookie_notice_accepted" for cookie in cookies)
 
     @pytest.mark.asyncio
     async def test_initialize_browser_exception(self):
@@ -401,9 +395,6 @@ class TestBrowserUnit:
     @pytest.mark.asyncio
     async def test_handle_cookie_banner_exception(self):
         """测试cookie横幅处理函数 - 异常处理"""
-        # 创建模拟页面
-        mock_page = AsyncMock()
-
         # 创建模拟横幅 - 设置为抛出异常
         mock_banner = AsyncMock()
         mock_banner.is_visible = AsyncMock(side_effect=Exception("模拟异常"))

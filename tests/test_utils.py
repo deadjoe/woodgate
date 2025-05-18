@@ -258,6 +258,7 @@ class TestUtilsUnit:
     @pytest.mark.asyncio
     async def test_handle_cookie_popup_js_click(self):
         """测试处理Cookie弹窗时使用JavaScript点击"""
+
         # 创建一个简单的模拟实现
         async def mock_handle_cookie_popup(page):
             # 模拟JavaScript点击成功的情况
@@ -279,6 +280,7 @@ class TestUtilsUnit:
     @pytest.mark.asyncio
     async def test_handle_cookie_popup_text_button_click(self):
         """测试处理Cookie弹窗时通过文本找到按钮并点击"""
+
         # 创建一个简单的模拟实现
         async def mock_handle_cookie_popup(page):
             # 模拟通过文本找到按钮并点击成功的情况

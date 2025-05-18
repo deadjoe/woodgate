@@ -101,7 +101,8 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
 
     try:
         # 设置较短的超时时间，避免在没有弹窗的情况下等待太久
-        page.set_default_timeout(timeout * 1000)  # 转换为毫秒
+        # 注意：在某些版本的Playwright中，set_default_timeout可能是异步方法
+        await page.set_default_timeout(timeout * 1000)  # 转换为毫秒
 
         # 优化：使用更高效的CSS选择器，减少DOM查询次数
         popup_selectors = [
@@ -161,7 +162,7 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                                 await close_button.click()
                                 log_step("已点击关闭按钮")
                                 # 恢复默认超时时间
-                                page.set_default_timeout(30000)
+                                await page.set_default_timeout(30000)
                                 return True
                         except Exception:
                             continue
@@ -193,7 +194,7 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                                 await locator.click(timeout=1000)
                                 log_step(f"找到并点击了文本为'{button_text}'的按钮")
                             # 恢复默认超时时间
-                            page.set_default_timeout(30000)
+                            await page.set_default_timeout(30000)
                             return True
                         except Exception:
                             continue
@@ -239,7 +240,7 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                         )
                         log_step("已使用JavaScript尝试点击按钮")
                         # 恢复默认超时时间
-                        page.set_default_timeout(30000)
+                        await page.set_default_timeout(30000)
                         return True
                     except Exception:
                         pass
@@ -247,13 +248,13 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                 continue
 
         # 恢复默认超时时间
-        page.set_default_timeout(30000)
+        await page.set_default_timeout(30000)
         log_step("未发现cookie通知")
         return False
 
     except Exception as e:
         # 恢复默认超时时间
-        page.set_default_timeout(30000)
+        await page.set_default_timeout(30000)
         log_step(f"处理cookie通知时出错: {e}")
         return False
 

@@ -183,8 +183,8 @@ class TestUtilsUnit:
         # 确保click方法是可等待的AsyncMock
         mock_close_button.click = AsyncMock()
 
-        # 设置set_default_timeout为MagicMock避免协程警告
-        mock_page.set_default_timeout = MagicMock()
+        # 设置set_default_timeout为AsyncMock以支持await
+        mock_page.set_default_timeout = AsyncMock()
 
         # 设置模拟行为 - 找到Cookie弹窗和关闭按钮
         mock_page.wait_for_selector.return_value = mock_cookie_notice
@@ -214,8 +214,8 @@ class TestUtilsUnit:
         mock_locator.first = MagicMock(return_value=mock_button)
         mock_page.get_by_text = MagicMock(return_value=mock_locator)
 
-        # 设置set_default_timeout为MagicMock避免协程警告
-        mock_page.set_default_timeout = MagicMock()
+        # 设置set_default_timeout为AsyncMock以支持await
+        mock_page.set_default_timeout = AsyncMock()
 
         # 设置模拟行为 - 未找到Cookie弹窗
         mock_page.wait_for_selector.side_effect = Exception("选择器超时")
@@ -238,8 +238,8 @@ class TestUtilsUnit:
         # 确保evaluate方法是可等待的AsyncMock
         mock_page.evaluate = AsyncMock()
 
-        # 设置set_default_timeout为MagicMock避免协程警告
-        mock_page.set_default_timeout = MagicMock()
+        # 设置set_default_timeout为AsyncMock以支持await
+        mock_page.set_default_timeout = AsyncMock()
 
         # 设置模拟行为 - 所有选择器都出现异常
         # 直接使用Exception作为side_effect
@@ -268,7 +268,7 @@ class TestUtilsUnit:
         with patch("woodgate.core.utils.handle_cookie_popup", side_effect=mock_handle_cookie_popup):
             # 创建模拟页面
             mock_page = AsyncMock()
-            mock_page.set_default_timeout = MagicMock()
+            mock_page.set_default_timeout = AsyncMock()
 
             # 调用被测试函数
             with patch("woodgate.core.utils.log_step"):
@@ -290,7 +290,7 @@ class TestUtilsUnit:
         with patch("woodgate.core.utils.handle_cookie_popup", side_effect=mock_handle_cookie_popup):
             # 创建模拟页面
             mock_page = AsyncMock()
-            mock_page.set_default_timeout = MagicMock()
+            mock_page.set_default_timeout = AsyncMock()
 
             # 调用被测试函数
             with patch("woodgate.core.utils.log_step"):
@@ -305,13 +305,13 @@ class TestUtilsUnit:
         # 创建模拟页面
         mock_page = AsyncMock()
         # 设置set_default_timeout抛出异常
-        mock_page.set_default_timeout = MagicMock(side_effect=Exception("模拟超时设置异常"))
+        mock_page.set_default_timeout = AsyncMock(side_effect=Exception("模拟超时设置异常"))
 
         # 创建一个简单的模拟实现，直接返回False
         async def mock_impl(page):
             try:
                 # 这里会抛出异常
-                page.set_default_timeout(1000)
+                await page.set_default_timeout(1000)
                 return True
             except Exception:
                 return False

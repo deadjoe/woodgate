@@ -235,7 +235,8 @@ class TestBrowserUnit:
         mock_page = AsyncMock()
 
         # 设置特定方法为同步方法，避免协程警告
-        mock_page.on = MagicMock()
+        # 确保on方法返回一个可等待的对象，以便在代码中可以正确地await
+        mock_page.on = MagicMock(return_value=None)
         mock_page.evaluate = AsyncMock()
         mock_page.get_by_text = MagicMock()
         mock_button = AsyncMock()
@@ -422,7 +423,8 @@ class TestBrowserUnit:
         mock_page = AsyncMock()
 
         # 设置特定方法为同步方法，避免协程警告
-        mock_page.on = MagicMock()
+        # 确保on方法返回一个可等待的对象，以便在代码中可以正确地await
+        mock_page.on = MagicMock(return_value=None)
         mock_page.evaluate = AsyncMock()
         mock_page.get_by_text = MagicMock()
         mock_button = AsyncMock()
@@ -462,7 +464,8 @@ class TestBrowserUnit:
         mock_page = AsyncMock()
 
         # 设置特定方法为同步方法，避免协程警告
-        mock_page.on = MagicMock()
+        # 确保on方法返回一个可等待的对象，以便在代码中可以正确地await
+        mock_page.on = MagicMock(return_value=None)
         mock_page.evaluate = AsyncMock(side_effect=Exception("模拟JavaScript异常"))
         mock_page.get_by_text = MagicMock()
 

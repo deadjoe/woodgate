@@ -13,33 +13,34 @@
 - [7. 文档生成](#7-文档生成)
 - [8. 测试覆盖率分析](#8-测试覆盖率分析)
 - [9. 测试优化建议](#9-测试优化建议)
+- [10. Python 测试入门指南](#10-python-测试入门指南)
 
 ## 1. 测试框架与工具
 
 ### 1.1 核心测试框架
 
-- **pytest (8.3.5)**: 主要测试框架，用于运行所有单元测试和集成测试
-- **pytest-asyncio (0.26.0)**: 支持异步测试的 pytest 插件
-- **pytest-playwright (0.7.0)**: 集成 Playwright 进行浏览器自动化测试的 pytest 插件
-- **pytest-cov (6.1.1)**: 用于生成测试覆盖率报告的 pytest 插件
+- **pytest**: 主要测试框架，用于运行所有单元测试和集成测试
+- **pytest-asyncio**: 支持异步测试的 pytest 插件
+- **pytest-playwright**: 集成 Playwright 进行浏览器自动化测试的 pytest 插件
+- **pytest-cov**: 用于生成测试覆盖率报告的 pytest 插件
 
 ### 1.2 浏览器自动化工具
 
-- **Playwright (1.52.0)**: 用于浏览器自动化测试，支持多种浏览器
-- **Selenium (4.31.0)**: 作为备选的浏览器自动化工具
+- **Playwright**: 用于浏览器自动化测试，支持多种浏览器
+- **Selenium**: 作为备选的浏览器自动化工具
 
 ### 1.3 代码质量工具
 
-- **Black (25.1.0)**: Python 代码格式化工具
-- **isort (6.0.1)**: 导入语句排序工具
-- **flake8 (7.2.0)**: Python 代码风格检查工具
-- **pylint (3.3.7)**: 全面的 Python 代码静态分析工具
-- **ruff (0.11.8)**: 快速的 Python linter，用 Rust 编写
-- **mypy (1.9.0)**: Python 静态类型检查工具
+- **Black**: Python 代码格式化工具
+- **isort**: 导入语句排序工具
+- **flake8**: Python 代码风格检查工具
+- **pylint**: 全面的 Python 代码静态分析工具
+- **ruff**: 快速的 Python linter，用 Rust 编写
+- **mypy**: Python 静态类型检查工具
 
 ### 1.4 工作流自动化工具
 
-- **pre-commit (3.5.0)**: Git 预提交钩子管理工具
+- **pre-commit**: Git 预提交钩子管理工具
 - **uv**: Python 包管理和虚拟环境工具
 
 ## 2. 测试类型与方法
@@ -48,15 +49,14 @@
 
 项目中的单元测试主要集中在 `tests/` 目录下，按模块划分为不同的测试文件：
 
-- **`test_async_helpers.py`**: 测试异步辅助函数
 - **`test_auth.py`**: 测试认证相关功能
 - **`test_browser.py`**: 测试浏览器操作功能
 - **`test_config.py`**: 测试配置管理功能
 - **`test_main.py`**: 测试主程序入口
-- **`test_mcp_server.py`**: 测试 MCP 服务器功能
 - **`test_search.py`**: 测试搜索功能
 - **`test_server.py`**: 测试服务器功能
 - **`test_utils.py`**: 测试工具类函数
+- **`test_with_playwright_fixtures.py`**: 使用 Playwright 固件的测试
 
 单元测试采用了以下测试方法：
 - 正常路径测试（Happy Path Testing）
@@ -154,16 +154,6 @@ no_implicit_optional = True
 strict_optional = True
 ```
 
-对于第三方库，配置了特殊处理：
-
-```ini
-[mypy.plugins.playwright.*]
-ignore_missing_imports = True
-
-[mypy.plugins.httpx.*]
-ignore_missing_imports = True
-```
-
 ### 3.3 代码风格配置
 
 项目使用多种工具确保代码风格一致：
@@ -196,14 +186,6 @@ ignore = ["E501"]  # 忽略行长度检查，由black处理
 known-first-party = ["woodgate"]
 ```
 
-**flake8 配置**:
-```ini
-[flake8]
-max-line-length = 100
-exclude = .git,__pycache__,build,dist
-ignore = E501
-```
-
 ## 4. 自动化测试流程
 
 ### 4.1 测试运行脚本
@@ -226,42 +208,7 @@ ignore = E501
 
 ### 4.2 预提交钩子
 
-项目使用 pre-commit 在代码提交前自动运行检查，配置在 `.pre-commit-config.yaml` 中：
-
-```yaml
-repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
-    -   id: check-yaml
-    -   id: check-added-large-files
-
--   repo: https://github.com/psf/black
-    rev: 25.1.0
-    hooks:
-    -   id: black
-        args: [--line-length=100]
-
--   repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-    -   id: isort
-        args: ["--profile", "black", "--line-length", "100"]
-
--   repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.8
-    hooks:
-    -   id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
-    hooks:
-    -   id: mypy
-        additional_dependencies: [types-requests]
-```
+项目使用 pre-commit 在代码提交前自动运行检查，配置在 `.pre-commit-config.yaml` 中。
 
 预提交钩子确保每次提交的代码都符合项目的代码质量标准。
 
@@ -297,138 +244,6 @@ repos:
 - **Black**: 自动格式化 Python 代码，确保一致的代码风格
 - **isort**: 自动排序导入语句，确保导入顺序一致
 
-## 6. 持续集成与部署
-
-### 6.1 GitHub Actions
-
-项目使用 GitHub Actions 进行持续集成，配置在 `.github/workflows/python-tests.yml` 中：
-
-```yaml
-name: Python Tests
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ['3.10', '3.11', '3.12']
-
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-    - name: Install dependencies
-      run: |
-        uv pip install --system -e ".[dev]"
-
-    - name: Install Playwright browsers
-      run: |
-        python -m playwright install chromium
-
-    - name: Lint with ruff
-      run: |
-        uv run ruff check woodgate tests
-
-    - name: Check types with mypy
-      run: |
-        uv run mypy woodgate
-
-    - name: Run tests
-      run: |
-        uv run pytest -v --cov=woodgate
-
-    - name: Generate coverage report
-      run: |
-        uv run pytest --cov=woodgate --cov-report=xml
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
-```
-
-CI 流程包括：
-- 在多个 Python 版本上运行测试
-- 运行代码风格检查和静态分析
-- 运行单元测试和生成覆盖率报告
-- 上传覆盖率报告到 Codecov
-
-### 6.2 文档构建
-
-项目在 CI 中也包含了文档构建流程：
-
-```yaml
-  docs:
-    runs-on: ubuntu-latest
-    needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    steps:
-    - uses: actions/checkout@v3
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
-
-    - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-
-    - name: Install dependencies
-      run: |
-        uv pip install --system -e ".[dev]"
-
-    - name: Build documentation
-      run: |
-        cd docs
-        uv run sphinx-apidoc -f -o source ../woodgate
-        uv run make html
-```
-
-文档构建仅在主分支上的推送事件触发，并且只有在测试通过后才会执行。
-
-## 7. 文档生成
-
-### 7.1 Sphinx 文档
-
-项目使用 Sphinx 生成 API 文档，配置在 `docs/conf.py` 中。文档生成过程包括：
-
-1. 使用 `sphinx-apidoc` 从代码中提取 API 文档
-2. 使用 `sphinx-build` 构建 HTML 文档
-
-文档生成可以通过以下命令执行：
-
-```bash
-./run_all_checks.sh --docs
-```
-
-### 7.2 文档主题和扩展
-
-项目使用以下 Sphinx 扩展和主题：
-
-- **sphinx_rtd_theme**: Read the Docs 主题，提供现代化的文档外观
-- **sphinx.ext.autodoc**: 自动从代码中提取文档
-- **sphinx.ext.viewcode**: 在文档中显示源代码
-- **sphinx.ext.napoleon**: 支持 Google 风格的文档字符串
-- **sphinx_autodoc_typehints**: 从类型注解中提取类型信息
-
 ## 8. 测试覆盖率分析
 
 ### 8.1 覆盖率工具
@@ -446,87 +261,280 @@ pytest --cov=woodgate --cov-report=term --cov-report=html
 ### 8.2 覆盖率目标
 
 项目的当前覆盖率情况：
-- 总体覆盖率：84%
+- 总体覆盖率：85%
 - 各模块覆盖率：
-  - `__init__.py`: 100%
-  - `__main__.py`: 82%
-  - `config.py`: 91%
-  - `core/__init__.py`: 100%
-  - `core/auth.py`: 79%
-  - `core/browser.py`: 71%
-  - `core/search.py`: 93%
-  - `core/utils.py`: 73%
-  - `server.py`: 96%
+  - `core/browser.py`: 71% (需要提高)
+  - `core/utils.py`: 73% (需要提高)
+  - `core/auth.py`: 79% (需要提高)
+  - 其他模块: 90%以上
 
 项目的目标是保持或提高当前的覆盖率水平，特别是提高低覆盖率模块的测试覆盖。
 
-### 8.3 CI 中的覆盖率报告
+## 10. Python 测试入门指南
 
-在 CI 流程中，覆盖率报告会被上传到 Codecov，以便进行历史跟踪和可视化：
+本节专为 Python 测试初学者设计，提供快速上手指南和最佳实践。
 
-```yaml
-- name: Upload coverage to Codecov
-  uses: codecov/codecov-action@v3
-  with:
-    file: ./coverage.xml
-    fail_ci_if_error: false
+### 10.1 测试基础概念
+
+#### 什么是单元测试？
+
+单元测试是测试代码中最小可测试单元（通常是函数或方法）的过程。目标是验证每个单元在隔离状态下是否按预期工作。
+
+#### 什么是集成测试？
+
+集成测试验证多个单元或组件一起工作时的行为。它测试组件之间的交互和数据流。
+
+#### 什么是端到端测试？
+
+端到端测试模拟真实用户场景，测试整个应用流程从开始到结束的功能。
+
+### 10.2 pytest 快速入门
+
+#### 创建第一个测试
+
+创建一个名为 `test_example.py` 的文件：
+
+```python
+# 被测试的函数
+def add(a, b):
+    return a + b
+
+# 测试函数
+def test_add():
+    assert add(1, 2) == 3
+    assert add(-1, 1) == 0
+    assert add(-1, -1) == -2
 ```
 
-## 9. 测试优化建议
+#### 运行测试
 
-### 9.1 提高测试覆盖率
+```bash
+pytest test_example.py -v
+```
 
-- **增加低覆盖率模块的测试**：
-  - 重点关注 `browser.py`（71%）和 `utils.py`（73%）模块
-  - 为 `auth.py`（79%）添加更多认证场景的测试
+#### 使用断言
 
-- **添加更多边缘情况测试**：
-  - 增加网络错误处理测试
-  - 增加超时处理测试
-  - 增加并发操作测试
+pytest 使用 Python 的 `assert` 语句进行验证：
 
-### 9.2 改进测试结构
+```python
+def test_string_methods():
+    text = "hello"
+    assert text.upper() == "HELLO"
+    assert text.capitalize() == "Hello"
+    assert "e" in text
+```
 
-- **引入测试分层策略**：
-  - 明确区分单元测试、集成测试和端到端测试
-  - 使用 pytest 标记系统更有效地组织测试
+### 10.3 模拟对象 (Mocks)
 
-- **实现测试数据管理**：
-  - 引入 `factory-boy` 和 `faker` 生成一致的测试数据
-  - 创建测试数据工厂，减少测试代码中的重复
+模拟对象用于替代测试中的真实依赖，特别是外部服务或复杂组件。
 
-### 9.3 解决现有问题
+#### 基本模拟示例
 
-- **修复异步代码警告**：
-  - 解决 RuntimeWarning: coroutine was never awaited 警告
-  - 检查 `browser.py` 和 `utils.py` 中的异步代码
+```python
+from unittest.mock import MagicMock
 
-- **完善文档结构**：
-  - 解决文档未包含在目录树中的警告
-  - 完善模块和函数的文档注释
+# 模拟一个数据库连接
+db = MagicMock()
+db.connect.return_value = True
+db.query.return_value = ["result1", "result2"]
 
-### 9.4 增强测试自动化
+# 测试使用模拟对象
+def test_with_mock_db():
+    assert db.connect() is True
+    results = db.query("SELECT * FROM users")
+    assert len(results) == 2
+    assert "result1" in results
+```
 
-- **引入性能测试**：
-  - 使用 `locust` 进行负载测试
-  - 使用 `py-spy` 和 `scalene` 进行性能分析
+#### 模拟异步函数
 
-- **增强安全测试**：
-  - 添加依赖安全检查（使用 `pip-audit`）
-  - 添加 OWASP 安全测试
+```python
+from unittest.mock import AsyncMock
+import pytest
 
-- **实现测试报告增强**：
-  - 使用 `pytest-html` 生成更美观的测试报告
-  - 使用 `pytest-xdist` 并行执行测试，提高速度
+async def fetch_data(url):
+    # 实际实现会调用外部API
+    pass
 
-### 9.5 逐步提高类型安全
+@pytest.mark.asyncio
+async def test_fetch_data():
+    # 创建异步模拟
+    fetch_data = AsyncMock(return_value={"status": "success", "data": [1, 2, 3]})
 
-- **增加类型注解覆盖**：
-  - 为核心模块添加完整的类型注解
-  - 逐步提高 mypy 配置的严格程度
+    # 调用并测试
+    result = await fetch_data("https://example.com/api")
+    assert result["status"] == "success"
+    assert len(result["data"]) == 3
 
-- **启用更严格的类型检查**：
-  - 在稳定模块中启用 `disallow_untyped_defs`
-  - 最终目标是实现全项目的严格类型检查
+    # 验证调用
+    fetch_data.assert_called_once_with("https://example.com/api")
+```
 
-通过实施这些优化建议，可以进一步提高项目的代码质量、测试覆盖率和开发效率。
+### 10.4 测试固件 (Fixtures)
+
+固件是测试前准备和测试后清理的机制，可以在多个测试之间重用。
+
+#### 基本固件示例
+
+```python
+import pytest
+
+@pytest.fixture
+def sample_data():
+    """提供测试数据的固件"""
+    return {"name": "Test User", "email": "test@example.com", "age": 30}
+
+def test_user_name(sample_data):
+    assert sample_data["name"] == "Test User"
+
+def test_user_email(sample_data):
+    assert "@" in sample_data["email"]
+```
+
+#### 固件作用域
+
+固件可以有不同的作用域：
+
+```python
+@pytest.fixture(scope="function")  # 默认，每个测试函数运行一次
+def function_fixture():
+    return {}
+
+@pytest.fixture(scope="class")  # 每个测试类运行一次
+def class_fixture():
+    return {}
+
+@pytest.fixture(scope="module")  # 每个测试模块运行一次
+def module_fixture():
+    return {}
+
+@pytest.fixture(scope="session")  # 整个测试会话运行一次
+def session_fixture():
+    return {}
+```
+
+### 10.5 参数化测试
+
+参数化测试允许使用不同的输入运行相同的测试代码。
+
+```python
+import pytest
+
+def is_palindrome(s):
+    return s == s[::-1]
+
+@pytest.mark.parametrize("input_string,expected", [
+    ("radar", True),
+    ("hello", False),
+    ("level", True),
+    ("python", False),
+    ("", True),
+])
+def test_is_palindrome(input_string, expected):
+    assert is_palindrome(input_string) == expected
+```
+
+### 10.6 测试异步代码
+
+使用 `pytest-asyncio` 测试异步函数：
+
+```python
+import pytest
+import asyncio
+
+async def async_add(a, b):
+    await asyncio.sleep(0.1)  # 模拟异步操作
+    return a + b
+
+@pytest.mark.asyncio
+async def test_async_add():
+    result = await async_add(1, 2)
+    assert result == 3
+```
+
+### 10.7 常见测试模式
+
+#### 设置-执行-断言模式
+
+```python
+def test_something():
+    # 设置 (Setup)
+    data = prepare_test_data()
+
+    # 执行 (Execute)
+    result = function_under_test(data)
+
+    # 断言 (Assert)
+    assert result == expected_value
+```
+
+#### 异常测试
+
+```python
+import pytest
+
+def divide(a, b):
+    return a / b
+
+def test_divide_by_zero():
+    with pytest.raises(ZeroDivisionError):
+        divide(1, 0)
+```
+
+### 10.8 测试最佳实践
+
+1. **测试应该是独立的**：一个测试不应依赖于其他测试的结果。
+
+2. **测试应该是可重复的**：每次运行应产生相同的结果。
+
+3. **测试应该关注一个方面**：每个测试应该验证一个特定的行为。
+
+4. **使用描述性的测试名称**：名称应该清楚地表明测试的内容。
+
+5. **避免测试实现细节**：测试应该关注行为而不是实现。
+
+6. **保持测试简单**：复杂的测试更难维护和理解。
+
+7. **使用适当的断言**：选择最能表达预期结果的断言。
+
+8. **定期运行测试**：作为开发流程的一部分，频繁运行测试。
+
+### 10.9 调试测试
+
+#### 使用 -v 获取详细输出
+
+```bash
+pytest -v
+```
+
+#### 使用 -s 显示打印输出
+
+```bash
+pytest -s
+```
+
+#### 使用 --pdb 在失败时进入调试器
+
+```bash
+pytest --pdb
+```
+
+#### 只运行特定测试
+
+```bash
+pytest test_file.py::test_function
+```
+
+### 10.10 从这个项目学习
+
+1. **查看现有测试**：浏览 `tests/` 目录中的测试文件，了解项目的测试方法。
+
+2. **运行测试**：使用 `./run_all_checks.sh --test` 运行所有测试。
+
+3. **尝试编写新测试**：为现有功能编写额外的测试，特别是覆盖率较低的模块。
+
+4. **学习模拟技术**：研究项目中如何模拟外部依赖，特别是浏览器和网络请求。
+
+5. **理解异步测试**：学习项目如何测试异步代码，这是现代 Python 应用的重要部分。
+
+通过遵循这些指南并研究项目中的实际测试，您将能够快速掌握 Python 测试的基础知识和最佳实践。

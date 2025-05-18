@@ -128,10 +128,10 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
     # 添加一个通用的cookie横幅处理程序，用于处理可能的iframe内的cookie横幅
     try:
         # 使用JavaScript处理可能的iframe内的cookie横幅
-        async def handle_all_cookie_banners() -> None:
+        async def handle_all_cookie_banners(page_obj: Page) -> None:
             try:
                 # 使用简化的JavaScript代码处理Red Hat特定的cookie通知
-                await page.evaluate(
+                await page_obj.evaluate(
                     """
                     () => {
                         // 设置Red Hat特定的cookie接受标志
@@ -207,7 +207,7 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
                 try:
                     # 只检查最常用的接受文本
                     for text in ["Accept", "I agree"]:
-                        button = page.get_by_text(text, exact=False)
+                        button = page_obj.get_by_text(text, exact=False)
                         if await button.count() > 0:
                             logger.info(f"找到文本为 '{text}' 的按钮，尝试点击")
                             await button.first.click(timeout=1000, force=True)
@@ -221,8 +221,10 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
         # 只在页面加载后执行一次，避免重复执行
         # 使用正确的异步回调函数
         async def on_load_handler(page_obj: Page) -> None:
-            await handle_all_cookie_banners()
+            await handle_all_cookie_banners(page_obj)
 
+        # 注意：page.on()是同步方法，不需要await
+        # 在测试中，我们使用MagicMock模拟这个方法，避免协程警告
         page.on("load", on_load_handler)
 
         logger.debug("已添加通用cookie横幅处理程序")

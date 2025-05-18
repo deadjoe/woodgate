@@ -309,14 +309,14 @@ async def get_document(document_url: str) -> DocumentResult:
         # 将结果转换为DocumentContent对象
         if "error" in document_data:
             return ErrorResponse(error=document_data["error"])
-        else:
-            return DocumentContent(
-                title=document_data.get("title", "未知标题"),
-                content=document_data.get("content", ""),
-                url=document_url,
-                doc_type=document_data.get("metadata", {}).get("Document Type", ""),
-                last_modified=document_data.get("metadata", {}).get("Last Modified", ""),
-            )
+
+        return DocumentContent(
+            title=document_data.get("title", "未知标题"),
+            content=document_data.get("content", ""),
+            url=document_url,
+            doc_type=document_data.get("metadata", {}).get("Document Type", ""),
+            last_modified=document_data.get("metadata", {}).get("Last Modified", ""),
+        )
     except Exception as e:
         logger.error(f"获取文档内容过程中出错: {e}")
         import traceback

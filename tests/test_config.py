@@ -5,14 +5,7 @@
 import os
 from unittest.mock import patch
 
-import pytest
-
-from woodgate.config import (
-    get_available_products,
-    get_config,
-    get_credentials,
-    get_document_types,
-)
+from woodgate.config import get_available_products, get_config, get_credentials, get_document_types
 
 
 class TestConfig:

@@ -118,7 +118,9 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
                         logger.debug(f"使用JavaScript点击失败: {e}")
 
             # 添加处理程序
-            page.add_locator_handler(banner_locator, handle_cookie_banner)
+            handler = page.add_locator_handler(banner_locator, handle_cookie_banner)
+            # 确保异步处理程序被正确等待
+            await handler
             logger.debug(f"已添加cookie横幅处理程序: {selector}")
         except Exception as e:
             logger.debug(f"为选择器 {selector} 添加处理程序失败: {e}")
@@ -217,7 +219,11 @@ async def setup_cookie_banner_handlers(page: Page) -> None:
                 logger.debug(f"通用cookie横幅处理失败: {e}")
 
         # 只在页面加载后执行一次，避免重复执行
-        page.on("load", lambda: handle_all_cookie_banners())
+        # 使用正确的异步回调函数
+        async def on_load_handler(page_obj: Page) -> None:
+            await handle_all_cookie_banners()
+
+        page.on("load", on_load_handler)
 
         logger.debug("已添加通用cookie横幅处理程序")
     except Exception as e:

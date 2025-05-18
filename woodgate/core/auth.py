@@ -76,8 +76,8 @@ async def login_to_redhat_portal(
         else:
             log_step("登录页面可能未完全准备好，但将继续尝试")
     except Exception as e:
-        logger.error(f"加载登录页面失败: {e}")
-        logger.debug(f"错误堆栈: {traceback.format_exc()}")
+        logger.error("加载登录页面失败: %s", e)
+        logger.debug("错误堆栈: %s", traceback.format_exc())
         return False
 
     # 注意：cookie横幅处理现在由browser.py中的setup_cookie_banner_handlers函数处理
@@ -191,7 +191,7 @@ async def login_to_redhat_portal(
             if not isinstance(login_result, dict):
                 login_result = {"success": False, "error": "Invalid response format"}
 
-            logger.info(f"JavaScript登录结果: {login_result}")
+            logger.info("JavaScript登录结果: %s", login_result)
 
             # 如果JavaScript检测到用户菜单，直接返回成功
             if login_result.get("user_menu"):
@@ -202,13 +202,13 @@ async def login_to_redhat_portal(
             try:
                 await page.wait_for_load_state("networkidle", timeout=30000)
             except Exception as e:
-                logger.warning(f"等待页面加载完成时出错: {e}")
+                logger.warning("等待页面加载完成时出错: %s", e)
 
             # 如果JavaScript登录成功但未检测到用户菜单，继续检查页面状态
             if login_result.get("success"):
                 # 检查URL
                 current_url = page.url
-                logger.debug(f"当前URL: {current_url}")
+                logger.debug("当前URL: %s", current_url)
 
                 # 如果已离开登录页面，可能登录成功
                 if "login" not in current_url or "customer-portal" in current_url:
@@ -220,12 +220,12 @@ async def login_to_redhat_portal(
                         if user_menu:
                             log_step("检测到用户菜单元素，登录成功")
                             return True
-                        else:
-                            logger.warning("未找到用户菜单元素")
-                            # 如果未找到用户菜单但已离开登录页面，也认为登录成功
-                            return True
+
+                        logger.warning("未找到用户菜单元素")
+                        # 如果未找到用户菜单但已离开登录页面，也认为登录成功
+                        return True
                     except Exception as e:
-                        logger.warning(f"检查用户菜单元素时出错: {e}")
+                        logger.warning("检查用户菜单元素时出错: %s", e)
                         # 如果检查用户菜单出错但已离开登录页面，也认为登录成功
                         return True
 
@@ -235,7 +235,7 @@ async def login_to_redhat_portal(
                 error_elements = await page.query_selector_all(error_selector)
                 for error in error_elements:
                     error_text = await error.text_content()
-                    logger.error(f"登录失败: {error_text}")
+                    logger.error("登录失败: %s", error_text)
 
                     # 如果是凭据错误，不再重试
                     if error_text and (
@@ -250,9 +250,9 @@ async def login_to_redhat_portal(
             try:
                 screenshot_path = f"login_error_{attempt}.png"
                 await page.screenshot(path=screenshot_path)
-                logger.info(f"已保存错误截图到 {screenshot_path}")
+                logger.info("已保存错误截图到 %s", screenshot_path)
             except Exception as screenshot_error:
-                logger.error(f"保存截图时出错: {screenshot_error}")
+                logger.error("保存截图时出错: %s", screenshot_error)
 
             # 如果不是最后一次尝试，则重试
             if attempt < max_retries - 1:
@@ -260,13 +260,13 @@ async def login_to_redhat_portal(
                 await asyncio.sleep(3)
                 await page.reload()
                 continue
-            else:
-                logger.error("已达到最大重试次数，登录失败")
-                return False
+
+            logger.error("已达到最大重试次数，登录失败")
+            return False
 
         except Exception as e:
-            logger.error(f"登录过程中出错: {e}")
-            logger.debug(f"错误堆栈: {traceback.format_exc()}")
+            logger.error("登录过程中出错: %s", e)
+            logger.debug("错误堆栈: %s", traceback.format_exc())
 
             # 如果不是最后一次尝试，则重试
             if attempt < max_retries - 1:
@@ -274,11 +274,11 @@ async def login_to_redhat_portal(
                 await asyncio.sleep(3)
                 await page.reload()
                 continue
-            else:
-                logger.error("已达到最大重试次数，登录失败")
-                return False
 
-    logger.error(f"登录失败，已尝试 {max_retries} 次")
+            logger.error("已达到最大重试次数，登录失败")
+            return False
+
+    logger.error("登录失败，已尝试 %d 次", max_retries)
     return False
 
 
@@ -334,8 +334,8 @@ async def check_login_status(page: Page) -> bool:
                 return False
 
     except Exception as e:
-        logger.error(f"检查登录状态时出错: {e}")
-        logger.debug(f"错误堆栈: {traceback.format_exc()}")
+        logger.error("检查登录状态时出错: %s", e)
+        logger.debug("错误堆栈: %s", traceback.format_exc())
         return False
 
     # 默认返回值，确保所有路径都有返回值

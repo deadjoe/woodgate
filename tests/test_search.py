@@ -2,11 +2,10 @@
 搜索模块测试 - 包含基本测试、扩展测试和单元测试
 """
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from playwright.async_api import ElementHandle, Page, TimeoutError
+from playwright.async_api import TimeoutError
 
 from woodgate.core.search import (
     build_search_url,
@@ -326,7 +325,7 @@ class TestSearchUnit:
         mock_page.query_selector = AsyncMock(side_effect=mock_query_selector)
 
         # 模拟元数据字段
-        mock_metadata_fields = []
+        mock_metadata_fields: list = []
         mock_page.query_selector_all = AsyncMock(return_value=mock_metadata_fields)
 
         # 模拟等待选择器

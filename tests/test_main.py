@@ -4,8 +4,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from woodgate.__main__ import main, parse_args
 
 

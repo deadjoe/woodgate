@@ -56,7 +56,13 @@ async def print_cookies(context: BrowserContext, step_name: str = ""):
     other_cookies = []
 
     for cookie in cookies:
-        cookie_info = f"名称: {cookie.get('name')}, 值: {cookie.get('value')[:10] if cookie.get('value') and len(cookie.get('value')) > 10 else cookie.get('value')}, 域: {cookie.get('domain')}"
+        name = cookie.get("name", "")
+        value = cookie.get("value", "")
+        domain = cookie.get("domain", "")
+
+        # 安全处理值的截断
+        value_display = value[:10] + "..." if value and len(value) > 10 else value
+        cookie_info = f"名称: {name}, 值: {value_display}, 域: {domain}"
 
         # 根据Cookie名称分类，便于诊断会话状态和认证问题
         if "auth" in cookie.get("name", "").lower() or "token" in cookie.get("name", "").lower():
@@ -68,13 +74,13 @@ async def print_cookies(context: BrowserContext, step_name: str = ""):
 
     if auth_cookies:
         log_step("认证相关Cookie:")
-        for cookie in auth_cookies:
-            log_step(f"  - {cookie}")
+        for cookie_info in auth_cookies:
+            log_step(f"  - {cookie_info}")
 
     if session_cookies:
         log_step("会话相关Cookie:")
-        for cookie in session_cookies:
-            log_step(f"  - {cookie}")
+        for cookie_info in session_cookies:
+            log_step(f"  - {cookie_info}")
 
     log_step("其他Cookie数量: " + str(len(other_cookies)))
     log_step("============================")
@@ -181,9 +187,10 @@ async def handle_cookie_popup(page: Page, timeout: float = 1.0) -> bool:
                     ]:
                         try:
                             # 使用text=按钮文本定位
-                            button = await page.get_by_text(button_text, exact=False).first()
-                            if button:
-                                await button.click(timeout=1000)
+                            locator = page.get_by_text(button_text, exact=False).first
+                            # 检查元素是否存在
+                            if await locator.count() > 0:
+                                await locator.click(timeout=1000)
                                 log_step(f"找到并点击了文本为'{button_text}'的按钮")
                             # 恢复默认超时时间
                             page.set_default_timeout(30000)

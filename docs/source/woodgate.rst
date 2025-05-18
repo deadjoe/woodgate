@@ -20,6 +20,14 @@ woodgate.config module
    :show-inheritance:
    :undoc-members:
 
+woodgate.mcp\_mock module
+-------------------------
+
+.. automodule:: woodgate.mcp_mock
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
 woodgate.server module
 ----------------------
 

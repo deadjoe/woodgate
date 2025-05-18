@@ -172,9 +172,9 @@ async def extract_search_results(page: Page) -> List[Dict[str, Any]]:
                     await asyncio.sleep(2)
                     await page.reload()
                     continue
-                else:
-                    log_step("多次尝试后仍未找到结果元素")
-                    return []
+
+                log_step("多次尝试后仍未找到结果元素")
+                return []
 
             # 处理每个搜索结果
             for result in result_elements:
@@ -240,9 +240,10 @@ async def extract_search_results(page: Page) -> List[Dict[str, Any]]:
                 log_step(f"将在2秒后重试... (尝试 {attempt + 1}/{max_retries})")
                 await asyncio.sleep(2)
                 await page.reload()
-            else:
-                log_step("多次尝试后仍出错")
-                return []
+                continue
+
+            log_step("多次尝试后仍出错")
+            return []
 
     log_step(f"成功提取 {len(results)} 个搜索结果")
     return results

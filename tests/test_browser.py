@@ -259,8 +259,8 @@ class TestBrowserUnit:
         # 确保捕获了处理函数
         assert handle_all_cookie_banners is not None
 
-        # 调用处理函数
-        await handle_all_cookie_banners()
+        # 调用处理函数，传入页面对象
+        await handle_all_cookie_banners(mock_page)
 
         # 验证JavaScript评估
         mock_page.evaluate.assert_called_once()
@@ -445,8 +445,8 @@ class TestBrowserUnit:
         # 确保捕获了处理函数
         assert handle_all_cookie_banners is not None
 
-        # 调用处理函数
-        await handle_all_cookie_banners()
+        # 调用处理函数，传入页面对象
+        await handle_all_cookie_banners(mock_page)
 
         # 验证JavaScript评估
         mock_page.evaluate.assert_called_once()
@@ -483,7 +483,7 @@ class TestBrowserUnit:
         assert handle_all_cookie_banners is not None
 
         # 调用处理函数 - 应该不会抛出异常
-        await handle_all_cookie_banners()
+        await handle_all_cookie_banners(mock_page)
 
         # 验证JavaScript评估被调用
         mock_page.evaluate.assert_called_once()

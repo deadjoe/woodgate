@@ -165,9 +165,9 @@ class TestUtilsUnit:
                 ("===== Cookie诊断信息 (测试步骤) =====",),
                 ("共有 3 个Cookie",),
                 ("认证相关Cookie:",),
-                ("  - 名称: auth_token, 值: test_auth_, 域: example.com",),
+                ("  - 名称: auth_token, 值: test_auth_..., 域: example.com",),
                 ("会话相关Cookie:",),
-                ("  - 名称: session_id, 值: test_sessi, 域: example.com",),
+                ("  - 名称: session_id, 值: test_sessi..., 域: example.com",),
                 ("其他Cookie数量: 1",),
                 ("============================",),
             ]

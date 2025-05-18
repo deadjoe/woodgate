@@ -79,30 +79,7 @@ run_tests() {
     echo -e "${GREEN}测试报告已生成在 htmlcov/ 目录${NC}"
 }
 
-# 生成文档
-generate_docs() {
-    print_header "生成文档"
 
-    # 检查 docs 目录是否存在
-    if [ ! -d "docs" ]; then
-        echo -e "${YELLOW}初始化 Sphinx 文档...${NC}"
-        mkdir -p docs
-        cd docs
-        sphinx-quickstart --no-sep -p woodgate -a "DEADJOE" -v "0.1.0" -l zh_CN --ext-autodoc --ext-viewcode
-        cd ..
-    fi
-
-    echo -e "${YELLOW}生成 API 文档...${NC}"
-    cd docs
-    uv run sphinx-apidoc -f -o source ../woodgate
-
-    echo -e "${YELLOW}构建 HTML 文档...${NC}"
-    uv run make html
-    check_status "文档生成"
-    cd ..
-
-    echo -e "${GREEN}文档已生成在 docs/_build/html/ 目录${NC}"
-}
 
 # 主函数
 main() {
@@ -115,7 +92,6 @@ main() {
         echo "  --format    只运行代码格式化"
         echo "  --lint      只运行静态代码分析"
         echo "  --test      只运行测试"
-        echo "  --docs      只生成文档"
         echo "  --all       运行所有检查 (默认)"
         echo "  --help, -h  显示此帮助信息"
         exit 0
@@ -128,14 +104,11 @@ main() {
         run_static_analysis
     elif [ "$1" = "--test" ]; then
         run_tests
-    elif [ "$1" = "--docs" ]; then
-        generate_docs
     else
         # 默认运行所有检查
         run_formatting
         run_static_analysis
         run_tests
-        generate_docs
     fi
 
     print_header "质量检查完成"
